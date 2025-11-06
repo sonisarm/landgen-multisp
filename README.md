@@ -3,4 +3,4 @@ Code for publication "Multi-species landscape genetics to inform territorial pla
 
 
 
-<img src="framework-connectivity-analysis.jpg" alt="framework" width="1000">
+<img src="Supp_framework.png" alt="framework" width="1000">
