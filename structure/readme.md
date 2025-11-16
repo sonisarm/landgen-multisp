@@ -19,7 +19,7 @@ Analyses ran for 500,000 MCMC iterations after 100,000 burn-in, testing K = 1–
 
 * *harvester.sh*: Processing script used to organize and summarize STRUCTURE outputs. It formats the output files for each K value so they can be processed by Structure Harvester, which calculates summary statistics such as likelihoods and prepares input files for determining the most probable K using the Evanno ΔK method.
 
-* *Cteydis*: Example of STRUCTURE input file containing the multilocus genotype data for all individuals. Its created from a STRand file in R with the following R code:
+* *Cteydis*: This is and example of the STRUCTURE-formatted genotype file containing the multilocus data used for the analyses. The first column corresponds to the individual ID, the second to the population code, and the remaining columns list the allele states for each locus. All STRUCTURE input files were generated in R from a STRand file using the corresponding conversion script in R:
 ```
 # read STRand. Assign ploidy and usatnt.
 Genambig <- read.STRand('STRand.csv', sep = ";", popInSam = FALSE)
