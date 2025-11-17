@@ -7,7 +7,7 @@ STRUCTURE was run on an HPC cluster using an array job to automate multiple valu
 ```
 sbatch --array=1-11%3 parallel_structure.slurm
 ```
-Analyses ran for 500,000 MCMC iterations after 100,000 burn-in, testing K = 1–10 with 30 replicates each. The best K was chosen using ΔK (Evanno et al. 2005) in STRUCTURE SELECTOR (Li & Liu 2018), and replicates were summarized with CLUMPAK (Kopelman et al. 2015), see harvester.sh
+Analyses ran for 500,000 MCMC iterations after 100,000 burn-in, testing K = 1–10 with 30 replicates each. The best K was chosen using ΔK (Evanno et al. 2005) and replicates were summarized with CLUMPAK (Kopelman et al. 2015), see *harvester.sh*.
 
 * *parallel_structure.slurm*: SLURM batch script that launches STRUCTURE analyses for multiple K values using a job array. For each K indicated by SLURM_ARRAY_TASK_ID, it starts 30 independent replicates in parallel using GNU Parallel.
 
