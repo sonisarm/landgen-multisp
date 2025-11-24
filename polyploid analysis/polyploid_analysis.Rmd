@@ -1,0 +1,276 @@
+---
+title: "Generic polysat workflow for microsatellite data"
+output: html_document
+date: "2025-02-11"
+---
+
+# Overview
+
+This R Markdown document provides a generic workflow for analysing microsatellite (SSR) data in **polysat** using input files in **STRand** format.  
+
+You can adapt file paths, species name, ploidy and locus information to your own dataset.
+
+
+## 1. Load libraries
+
+In this section we load all required R packages.  
+Aim: have the tools needed to import STRand data, handle polyploid genotypes and explore population structure.
+
+```{r setup, message=FALSE}
+library(polysat)      # Core package for polyploid microsatellite data
+library(readxl)       # Optional: read Excel files (e.g. coordinates)
+library(ape)          # Genetic distances, NJ trees
+library(poppr)        # Distance matrices, clone detection, etc.
+library(adegenet)     # Multivariate analyses (DAPC, PCA)
+library(PopGenReport) # Tools for population-genetic reporting (e.g. null alleles)
+```
+
+## 2. User input: paths, species name, ploidy and locus info
+
+Here you define dataset-specific parameters.  
+Aim: make the script reusable by only changing a few lines (file path, ploidy, etc.).
+
+```{r user_input}
+
+input_file   <- "path/to/your/STRand_file.csv"   # e.g. "../Data/STRand/MySpecies.csv"
+species_name <- "MySpecies"
+ploidy_level <- 4
+usatnt <- c(3, 3, 2, 4, 2, 2, 3, 3, 3, 4)
+```
+
+## 3. Import STRand data
+
+We read the STRand file into a `Genambig` object using **polysat**.  
+Aim: convert raw STRand data into a polysat-compatible format.
+
+```{r import_data}
+Genambig <- read.STRand(
+  input_file,
+  sep      = ";",     # Change if your file uses a different separator (e.g. ",")
+  popInSam = TRUE     # Set to FALSE if population info is NOT in sample names
+)
+
+# Quick look at samples and loci
+Samples(Genambig)
+Loci(Genambig)
+```
+
+## 4. Assign ploidy and microsatellite repeat information
+
+We set ploidy and the number of repeat units (`usatnt`) for each locus.  
+Aim: ensure polysat handles allele sizes correctly for your species.
+
+```{r ploidy_and_usatnt}
+Usatnts(Genambig) <- usatnt
+Ploidies(Genambig) <- ploidy_level
+all_samples <- Samples(Genambig)
+
+```
+
+## 5. Identify and inspect clonal genotypes
+
+We detect individuals sharing identical multilocus genotypes (clones).  
+Aim: decide whether to remove duplicate genotypes (e.g. from asexual reproduction or resampling).
+
+```{r clones}
+Genambig_copy <- Genambig
+
+clone_assignments <- assignClones(
+  d = meandistance.matrix(Genambig_copy)
+)
+
+clone_assignments
+```
+
+## 6. Explore genetic structure: distance matrix and NJ tree
+
+We compute a genetic distance matrix and build a Neighbor-Joining tree.  
+Aim: obtain a first view of genetic structure and how individuals cluster.
+
+```{r structure_tree, fig.height=6, fig.width=6}
+
+mydist <- meandistance.matrix(Genambig, distmetric = Lynch.distance)
+nj_tree <- njs(mydist)
+
+# Population information (if stored in PopInfo)
+pops <- Genambig@PopInfo
+pop_factor <- factor(pops)
+
+# Color tips by population
+tip_cols <- rainbow(length(levels(pop_factor)))[as.numeric(pop_factor)]
+
+plot(nj_tree,
+     type      = "unrooted",
+     tip.color = tip_cols,
+     cex       = 0.7,
+     main      = paste("Neighbor-Joining tree –", species_name))
+
+legend("topleft",
+       legend = levels(pop_factor),
+       col    = rainbow(length(levels(pop_factor))),
+       pch    = 19,
+       cex    = 0.7)
+
+```
+
+## 7. Explore genetic structure: PCA on distance matrix
+
+We perform a PCA-like ordination (classical MDS) on the distance matrix.  
+Aim: visualize main axes of genetic variation and detect clusters or gradients.
+
+```{r pca, fig.height=5, fig.width=6}
+
+# Classical multidimensional scaling (PCA-like) on distance matrix
+pca_coords <- cmdscale(mydist[Samples(Genambig), Samples(Genambig)])
+
+plot(pca_coords[, 1],
+     pca_coords[, 2],
+     xlab = "Axis 1",
+     ylab = "Axis 2",
+     pch  = 19,
+     col  = tip_cols,
+     main = paste("PCA of genetic distances –", species_name))
+
+legend("topright",
+       legend = levels(pop_factor),
+       col    = rainbow(length(levels(pop_factor))),
+       pch    = 19,
+       cex    = 0.7)
+```
+
+## 8. Allele correlations for allopolyploids
+
+We run `alleleCorrelations()` per locus and optionally save heatmaps.  
+Aim: explore whether alleles group into subgenomes in putative allopolyploid species.
+
+```{r allele_correlations, eval=FALSE}
+# Define loci to analyse (replace with your own locus names)
+loci_list <- Loci(Genambig)
+
+# Directory where heatmaps will be saved
+output_dir <- "results/polysat_heatmaps/"
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+correlation_results <- list()
+heatmap_results     <- list()
+
+for (locus in loci_list) {
+  cat("Processing locus:", locus, "
+")
+
+  tryCatch({
+    # Run allele correlations
+    correlation_results[[locus]] <- alleleCorrelations(
+      Genambig,
+      locus    = locus,
+      n.subgen = 2        # Example: 2 subgenomes in an allotetraploid
+    )
+
+    heatmap_data <- correlation_results[[locus]]$heatmap.dist
+
+    if (!is.null(heatmap_data)) {
+      png(filename = file.path(output_dir,
+                               paste0(species_name, "_Heatmap_", locus, ".png")),
+          width = 800, height = 800)
+
+      heatmap_results[[locus]] <- heatmap(
+        heatmap_data,
+        main = paste("Heatmap –", locus)
+      )
+      dev.off()
+    } else {
+      cat("No heatmap data for locus", locus, "
+")
+    }
+
+  }, error = function(e) {
+    cat("Error in locus", locus, ":", conditionMessage(e), "
+")
+  })
+}
+
+cat("Finished allele-correlation analysis.
+")
+```
+
+## 9. Test allele groups (testAlGroups)
+
+We test allele groupings suggested by the correlation analyses using `testAlGroups()`.  
+Aim: assess whether alleles at each locus can be partitioned into subgenomes in a biologically consistent way.
+
+```{r test_al_groups, eval=FALSE}
+Taparam_lowTol  <- list()
+Taparam_highTol <- list()
+
+for (locus in names(correlation_results)) {
+  cat("Testing allele groups for locus:", locus, "
+")
+
+  tryCatch({
+    # Stricter tolerance
+    Taparam_lowTol[[locus]] <- testAlGroups(
+      Genambig,
+      correlation_results[[locus]],
+      SGploidy    = 2,
+      null.weight = 0.5,
+      tolerance   = 0.05,
+      swap        = FALSE
+    )
+
+    # More relaxed tolerance
+    Taparam_highTol[[locus]] <- testAlGroups(
+      Genambig,
+      correlation_results[[locus]],
+      SGploidy    = 2,
+      null.weight = 0.5,
+      tolerance   = 0.10,
+      swap        = FALSE
+    )
+
+    cat("Tolerance 0.05 result:
+")
+    print(Taparam_lowTol[[locus]])
+
+    cat("Tolerance 0.10 result:
+")
+    print(Taparam_highTol[[locus]])
+
+  }, error = function(e) {
+    cat("Error in locus", locus, ":", conditionMessage(e), "
+")
+  })
+}
+
+cat("Finished allele-group testing.
+")
+```
+
+## 10. Optional: Catalán method of allele assignment
+
+We apply the Catalán et al. (2006) method as an alternative allele-assignment procedure.  
+Aim: provide a complementary, often faster method for allele assignment in polyploid datasets.
+
+```{r catalan_method, eval=FALSE}
+catalan_results <- vector("list", length(Loci(Genambig)))
+names(catalan_results) <- Loci(Genambig)
+
+for (L in Loci(Genambig)) {
+  cat("Running Catalán method for locus:", L, "
+")
+  catalan_results[[L]] <- catalanAlleles(
+    Genambig,
+    locus   = L,
+    verbose = TRUE
+  )
+}
+```
+
+## 11. Next steps and exporting results
+
+From here you can:
+
+- Export formatted files (e.g. Genepop, STRUCTURE, Genodive, SPAGeDi)  
+- Run more advanced multivariate analyses (DAPC, AMOVA, etc.)  
+- Integrate spatial coordinates for landscape genetic analyses  
+
+Adapt this template by changing file paths, species name, ploidy and locus lists to fit your own data.
