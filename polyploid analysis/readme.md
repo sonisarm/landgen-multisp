@@ -14,9 +14,8 @@ Although some methods address dosage and genotyping issues (e.g. Bruvo distance;
 1. Determine whether each polyploid species behaves more like an **autopolyploid** (tetrasomic inheritance) or an **allopolyploid** (disomic inheritance).
 2. Use this information to build **appropriate datasets** for downstream population genetic and structure analyses.
 
----
 
-### Step 1 – Inheritance mode assessment using FIS
+### Step 1 – Inheritance mode assessment using FIS in Genodive
 
 We first assessed whether the polyploid species follow mainly disomic or tetrasomic inheritance patterns by examining the **inbreeding coefficient (FIS)** across loci. Under strict disomic inheritance (as expected in allotetraploids), loci often show fixed heterozygosity, leading to negative FIS values, while deviations from this pattern are indicative of tetrasomic inheritance (Meirmans & Van Tienderen, 2012).
 
@@ -24,10 +23,8 @@ We first assessed whether the polyploid species follow mainly disomic or tetraso
 FIS was calculated at the “locus × population” level in GenoDive v3.06 (Meirmans, 2020), which also tests for Hardy–Weinberg equilibrium (HWE). To reduce confounding effects of population structure:
 1) a Lynch distance matrix was computed, 2) neighbor-joining trees were generated to visualize genetic clustering. These analyses were performed in section 6 of the R code *polyploid_analysis.Rmd*.
 
----
 
-### Step 2 – Isolocus assignment with polysat
-
+### Step 2 – Isolocus assignment with *polysat* in R
 To further clarify inheritance mode and identify isoloci (loci corresponding to different subgenomes in allopolyploids), we used the *polysat* package in sections 8 and 9 of R code *polyploid_analysis.Rmd*:
 1. **Initial allele clustering**
    - The function *`alleleCorrelations`* computes pairwise correlations among alleles using Fisher’s exact test.
@@ -39,7 +36,6 @@ To further clarify inheritance mode and identify isoloci (loci corresponding to 
    - The *`testAlGroups`* function evaluates these allele clusters against individual genotypes.
    - Isolocus assignments are refined within a tolerance threshold of 0.01, improving consistency with observed genotype patterns.
 
----
 
 ### Step 3 – Building “full” and “partial” datasets
 
