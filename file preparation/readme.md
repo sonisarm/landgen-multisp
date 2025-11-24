@@ -32,7 +32,7 @@ Python script to convert Excel microsatellite data into a **SPAGeDi**-compatible
   - Automatically builds the SPAGeDi header, including number of individuals, populations, loci, coordinates and allele coding parameters.
 - **Output:** Plain-text `.txt` file ready to be used as SPAGeDi input.
 
-## Requirements
+##### Requirements
 
 - **R** (for `create_formatted_files.Rmd`) with packages: `polysat`, `adegenet`, `poppr`, `tidyr`, `readxl`, `dplyr`, `radiator`, etc.
 - **Python 3** with `pandas` (and `openpyxl` for reading Excel files).
