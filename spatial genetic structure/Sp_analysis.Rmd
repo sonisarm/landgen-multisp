@@ -1,0 +1,734 @@
+---
+title: "Spatial Genetic Structure (Sp) Analysis Template"
+output: Sp comparison between species
+date: "2025-11-24"
+---
+
+# Overview
+
+This R Markdown document provides a generic workflow to estimate spatial genetic structure (Sp) following Vekemans & Hardy (2004).  
+
+It is designed so that you can:
+
+- Plug in your own **genetic distance matrix** (e.g., from Genodive) or compute **propShared** directly in R.  
+- Use your own **coordinate file** for individuals or populations.  
+- Estimate **Sp** at the **individual** or **population** level.  
+- Combine and compare **Sp** values across species or other groups.
+
+Replace file paths, species names, and parameter values with your own.
+
+```{r setup, include=FALSE}
+# Load required packages
+library(sp)        # spatial points / projections
+library(dplyr)     # data manipulation
+library(readxl)    # read Excel files
+library(polysat)   # polyploid microsatellite data
+library(ggplot2)   # plotting
+library(related)   # relatedness / coancestry (optional)
+```
+
+# 1. User Inputs and General Settings
+
+In this section you define:
+
+- A **short species code** (used inside the script and file names).
+- The **species name** (as used in your metadata).
+- The **island / region** you want to analyse.
+- Paths to your **genetic distance matrix** and **coordinate file**.
+- Ploidy and microsatellite settings (if you want to compute distances in R).
+
+```{r user_inputs}
+spp <- "species_code"              # e.g. "vch"
+sp  <- "Species name here"         # e.g. "Viola cheiranthifolia"
+isl <- "Region_or_island_name"     # e.g. "Tenerife"
+
+# Genetic distance / relatedness metric label (used in file names)
+# Examples: "bruvo", "euclidean", "propshared", etc.
+gendist <- "bruvo"
+
+# Path to Genodive genetic distance matrix (if using external distances)
+# Assumes filenames like: <gendist>_<species_code>.gdv
+genodive_path <- paste0("../Results/genodive/",
+                        gendist, "/",
+                        gendist, "_", spp, ".gdv")
+
+# Path to coordinate file (all species; will subset later)
+coord_path   <- "coord.xlsx"
+coord_sheet  <- "All"
+
+# Ploidy and microsatellite settings (used if computing distances in R from STRand)
+ploidy  <- 2             # e.g. 2 for diploid, 4 for tetraploid, etc.
+usatnt  <- c()           # vector with number of repeats for each microsatellite locus
+                         # e.g. usatnt <- c(2,3,3,6,6,2,4,5)
+
+# Output folder for Sp results
+sp_output_dir <- "../Results/sp/"
+```
+
+---
+
+# 2. Load Genetic Data
+
+You have two options:
+
+1. **Option A (default):** Load a genetic distance / relatedness matrix exported from external software (e.g. Genodive).  
+2. **Option B (optional):** Read STRand-format genotype data and compute a distance / relatedness matrix directly in R.
+
+## 2.1 Option A – Load genetic distances from Genodive (default)
+
+```{r load_genodive}
+# Load genetic distance matrix from text file (.gdv exported as tab-delimited)
+gd <- as.matrix(
+  read.table(genodive_path,
+             header    = TRUE,
+             sep       = "\t",
+             row.names = 1)
+)
+
+# Quick summary of distance values
+summary(as.vector(gd))
+
+# Individual labels (must match your coordinate file after cleaning)
+ind <- colnames(gd)
+head(ind)
+```
+
+## 2.2 Option B – Compute propShared in R (optional, set eval=FALSE)
+
+Use this if you have STRand-format genotype data and want to compute **propShared** (proportion of shared alleles) directly.  
+Adapt the file path, ploidy and `usatnt` to your data.
+
+```{r compute_propShared, eval=FALSE}
+# Example: read STRand file for your species
+Genambig <- read.STRand("../Data/STRand/your_species_file.csv",
+                        sep      = ";",
+                        popInSam = FALSE)
+
+# Set ploidy and microsatellite repeat numbers
+Ploidies(Genambig) <- ploidy
+Usatnts(Genambig)  <- usatnt
+
+# Convert to genind (adegenet format)
+genind <- gendata.to.genind(Genambig,
+                            samples = Samples(Genambig),
+                            loci    = Loci(Genambig))
+
+# Compute proportion of shared alleles
+gd <- propShared(genind)
+
+# Replace 'gendist' label if needed
+gendist <- "propshared"
+
+# Individual labels
+ind <- colnames(gd)
+head(ind)
+```
+
+---
+
+# 3. Load Site / Coordinate Data
+
+Here we load the site / coordinate data for all species and then subset to the species and region of interest.  
+
+Assumptions (adapt to your own structure):
+
+- The Excel sheet contains a row per **individual**.  
+- Columns include: `Species`, `Island`, `Code_analysis`, `Pop`, `X`, `Y`.
+
+```{r load_coords}
+Coord <- read_excel(coord_path, sheet = coord_sheet)
+
+# Ensure numeric coordinates
+Coord$X <- as.numeric(as.character(Coord$X))
+Coord$Y <- as.numeric(as.character(Coord$Y))
+
+# Subset by species and region / island
+Coord <- Coord %>%
+  dplyr::filter(Species == sp) %>%
+  dplyr::filter(Island  == isl)
+
+# Remove rows with any missing coordinates
+Coord <- na.omit(Coord)
+
+head(Coord)
+```
+
+---
+
+# 4. Align Genetic and Geographic Data
+
+The goal is to keep only individuals (or populations) that are present in **both** the genetic matrix and the coordinate table.
+
+## 4.1 Optional: clean individual names to match between files
+
+If your individual IDs differ between the genetic distance matrix and the coordinate file, you can clean them here.  
+Below is an example (commented out) illustrating how to strip prefixes, suffixes, etc.
+
+```{r id_cleaning, eval=FALSE}
+# Example: remove a prefix "VP1" or "VP2" from row/column names
+rownames(gd) <- sub("^VP[12]", "", rownames(gd))
+colnames(gd) <- sub("^VP[12]", "", colnames(gd))
+
+# Example: keep only the part starting at "VP"
+rownames(gd) <- sub(".*?(VP)", "\\1", rownames(gd))
+colnames(gd) <- sub(".*?(VP)", "\\1", colnames(gd))
+
+# Adapt these lines to your own naming conventions
+```
+
+## 4.2 Filter to individuals with coordinates
+
+```{r filter_individuals}
+# Vector of individuals for which we have coordinates
+inds_to_keep <- Coord$Code_analysis
+
+# Restrict genetic distance matrix to these individuals (rows and columns)
+gd_filtered <- gd[rownames(gd)  %in% inds_to_keep,
+                  colnames(gd)  %in% inds_to_keep]
+
+# Subset coordinate data frame to match the filtered matrix
+df <- Coord %>%
+  dplyr::select(Code_analysis, Pop, X, Y) %>%
+  dplyr::filter(Code_analysis %in% rownames(gd_filtered))
+
+# Sanity check: order df to match gd_filtered rows if desired
+df <- df[match(rownames(gd_filtered), df$Code_analysis), ]
+
+head(df)
+dim(gd_filtered)
+```
+
+## 4.3 Optional: population-level genetic matrix
+
+If you already have a **population-level** genetic matrix, or you want to work at the population level only, you can adapt this section.  
+Below is a template for filtering a **population-by-population** matrix:
+
+```{r filter_populations, eval=FALSE}
+# Example if gd is already population-by-population
+pops_to_keep <- Coord$Pop
+
+gd_filtered_pop <- gd[rownames(gd) %in% pops_to_keep,
+                      colnames(gd) %in% pops_to_keep]
+
+df_pop <- Coord %>%
+  dplyr::select(Pop, X, Y) %>%
+  dplyr::group_by(Pop) %>%
+  dplyr::summarise(X = mean(X, na.rm = TRUE),
+                   Y = mean(Y, na.rm = TRUE),
+                   .groups = "drop")
+```
+
+## 4.4 Optional: manually remove specific individuals
+
+Sometimes you may need to remove outliers or individuals with insufficient data.  
+Specify their codes here if needed.
+
+```{r manual_removal, eval=FALSE}
+remove_codes <- c("IND1", "IND2")  # replace with actual codes to remove
+
+# Remove from distance matrix (rows and columns)
+gd_filtered <- gd_filtered[!(rownames(gd_filtered) %in% remove_codes),
+                           !(colnames(gd_filtered) %in% remove_codes)]
+
+# Remove from metadata/dataframe
+df <- df[!(df$Code_analysis %in% remove_codes), ]
+```
+
+---
+
+# 5. Geographic Distances from Coordinates
+
+We now compute Euclidean distances between individuals (or population centroids) based on their coordinates.  
+
+> **Note:** If your coordinates are longitude/latitude, consider transforming them to a projected coordinate system before computing distances.
+
+```{r geo_distance}
+# Matrix of XY coordinates (you can also use projected coordinates here)
+xy <- as.matrix(data.frame(X = df$X, Y = df$Y))
+
+# Optionally convert to SpatialPoints (e.g. UTM zone 28, WGS84)
+utm <- SpatialPoints(coords = xy,
+                     proj4string = CRS("+proj=utm +zone=28 +datum=WGS84"))
+
+# Euclidean distances (in coordinate units)
+geo_distance <- as.matrix(dist(xy))
+
+summary(geo_distance[lower.tri(geo_distance)])
+```
+
+---
+
+# 6. Convert Genetic Distance to Genetic Similarity/Flow (if needed)
+
+The SP parameter is typically based on a **measure of relatedness or genetic similarity** that decreases with distance.  
+If your matrix `gd_filtered` contains **distances**, you can convert them into a similarity measure (e.g. multiply by -1 or transform to 1 - distance).  
+
+Below is a simple (and very generic) example:
+
+```{r genetic_similarity}
+# Here we simply multiply by -1 to convert "larger distance" into "smaller relatedness"
+# Adapt this step to your own metric and interpretation.
+grel <- gd_filtered * -1
+
+# Check range
+summary(grel[lower.tri(grel)])
+```
+
+In the rest of the script, we will use `grel` as the **genetic relatedness / similarity** matrix.
+
+---
+
+# 7. Estimate Sp
+
+We follow Vekemans & Hardy (2004):  
+\[
+Sp = -\frac{\text{Slope}}{1 - F_1}
+\]
+
+- `F1` is defined here as the **intercept** of the regression of genetic similarity on log(distance), i.e. value for distance ≈ 1 m.  
+- `Slope` is the slope of that regression.  
+- Significance of the spatial signal is assessed via a **permutation test** on the slope.
+
+You can estimate SP at:
+
+- The **individual level** (within each population), or  
+- The **population level** (between population centroids).
+
+## 7.1 Option 1 – Individual-level Sp (within each population)
+
+```{r sp_individual}
+# Minimum and maximum geographic distances (same unit as geo_distance)
+D.min <- 0.3   # e.g. 0.3 m minimum
+D.max <- 50    # e.g. 50  m maximum
+
+# Vector of population names
+Patch <- as.character(unique(df$Pop))
+
+# Matrix to store results
+Slope <- matrix(NA,
+                nrow = length(Patch),
+                ncol = 5,
+                dimnames = list(Patch,
+                                c("minED", "maxED", "F1", "Slope", "p.value")))
+
+# Number of permutations
+R <- 999
+
+for (i in seq_along(Patch)) {
+
+  pop_mask <- df$Pop == Patch[i]
+
+  # Subset relatedness and distances to the focal population
+  test_grel  <- grel[pop_mask, pop_mask]
+  test_sites <- df[pop_mask, ]
+
+  # Build a matrix of XY coordinates for this population
+  tmp_xy <- as.matrix(test_sites[, c("X", "Y")])
+
+  # Pairwise geographic distances
+  test_ED <- as.matrix(dist(tmp_xy))
+
+  # Extract lower triangle (unique pairwise comparisons)
+  GD <- test_grel[lower.tri(test_grel)]
+  ED <- test_ED[lower.tri(test_ED)]
+
+  # Apply distance filter
+  keep <- which(ED >= D.min & ED <= D.max)
+  GD   <- GD[keep]
+  ED   <- ED[keep]
+
+  # Skip if not enough pairs
+  if (length(GD) < 3) {
+    message("Skipping ", Patch[i], ": insufficient pairwise data after filtering.")
+    next
+  }
+
+  # Store min/max distances used
+  Slope[i, 1:2] <- range(ED)
+
+  # Fit linear model: genetic similarity ~ log(geographic distance)
+  model1 <- lm(GD ~ log(ED))
+
+  # Intercept (F1) and slope
+  Slope[i, 3:4] <- model1$coef
+
+  # Permutation test
+  Slope.sim <- rep(NA, R)
+  for (r in 1:R) {
+    # Permute individual labels
+    perm <- sample(1:nrow(test_grel))
+
+    # Permuted relatedness matrix
+    GD.sim.mat <- test_grel[perm, perm]
+
+    # Extract same pairwise comparisons and same distance filter
+    GD.sim <- GD.sim.mat[lower.tri(GD.sim.mat)][keep]
+
+    # Fit regression and store slope
+    Slope.sim[r] <- lm(GD.sim ~ log(ED))$coef[2]
+  }
+
+  # p-value: proportion of permuted slopes >= observed slope
+  Slope[i, 5] <- (sum(Slope.sim >= Slope[i, 4]) + 1) / (R + 1)
+
+  message("Population ", Patch[i], " done")
+}
+
+Slope_ind <- as.data.frame(Slope)
+Slope_ind$Pop <- rownames(Slope_ind)
+rownames(Slope_ind) <- NULL
+
+head(Slope_ind)
+```
+
+## 7.2 Option 2 – Population-level Sp (between population centroids)
+
+Here we estimate Sp based on **population mean coordinates** and a **population-by-population** genetic relatedness matrix.
+
+```{r sp_population}
+# Minimum geographic distance to avoid log(0)
+D.min_pop <- 0.1
+
+# Population-level relatedness matrix
+test_grel_pop <- grel
+
+# Population-level coordinates: mean X and Y per population
+test_sites_pop <- df %>%
+  dplyr::group_by(Pop) %>%
+  dplyr::summarise(X = mean(X, na.rm = TRUE),
+                   Y = mean(Y, na.rm = TRUE),
+                   .groups = "drop")
+
+# Distance matrix among population centroids
+tmp <- as.data.frame(test_sites_pop)
+rownames(tmp) <- tmp$Pop
+tmp$Pop <- NULL
+test_ED_pop <- as.matrix(dist(tmp))
+
+# Reorder relatedness matrix to match distance matrix
+ordered_names <- rownames(test_ED_pop)
+test_grel_pop <- test_grel_pop[ordered_names, ordered_names]
+
+# Extract lower triangle
+GD <- test_grel_pop[lower.tri(test_grel_pop)]
+ED <- test_ED_pop[lower.tri(test_ED_pop)]
+
+# Replace very small distances by D.min_pop
+ED[ED < D.min_pop] <- D.min_pop
+
+# Prepare output matrix (one line per population, though values will be identical
+# unless you adapt the model to be population-specific)
+Patch_pop <- ordered_names
+Slope_pop <- matrix(NA,
+                    nrow = length(Patch_pop),
+                    ncol = 5,
+                    dimnames = list(Patch_pop,
+                                    c("minED", "maxED", "F1", "Slope", "p.value")))
+
+# Constant distance range for all populations
+Slope_pop[, 1:2] <- range(ED)
+
+# Number of permutations
+R <- 999
+
+for (i in seq_along(Patch_pop)) {
+
+  # Fit linear model once (same for all populations)
+  model1 <- lm(GD ~ log(ED))
+  Slope_pop[i, 3:4] <- model1$coef
+
+  # Permutation test
+  Slope.sim <- rep(NA, R)
+  for (r in 1:R) {
+    a <- sample(1:nrow(test_grel_pop))
+    GD.sim <- test_grel_pop[a, a]
+    GD.sim <- GD.sim[lower.tri(GD.sim)]
+    Slope.sim[r] <- lm(GD.sim ~ log(ED))$coef[2]
+  }
+
+  # p-value: proportion of permuted slopes ≥ observed
+  Slope_pop[i, 5] <- (sum(Slope.sim >= Slope_pop[i, 4]) + 1) / (R + 1)
+
+  message("Population ", Patch_pop[i], " done")
+}
+
+Slope_pop_df <- as.data.frame(Slope_pop)
+Slope_pop_df$Pop <- rownames(Slope_pop_df)
+rownames(Slope_pop_df) <- NULL
+
+head(Slope_pop_df)
+```
+
+---
+
+# 8. Compute Sp Values
+
+Once you have `F1` and `Slope`, compute Sp as:
+
+\[
+Sp = -\frac{\text{Slope}}{1 - F_1}
+\]
+
+## 8.1 Individual-level Sp
+
+```{r sp_compute_individual}
+Slope_ind$Sp <- -Slope_ind$Slope / (1 - Slope_ind$F1)
+head(Slope_ind)
+```
+
+## 8.2 Population-level Sp
+
+```{r sp_compute_population}
+Slope_pop_df$Sp <- -Slope_pop_df$Slope / (1 - Slope_pop_df$F1)
+head(Slope_pop_df)
+```
+
+---
+
+# 9. Save Sp Results for This Species
+
+You can save either the individual-level or population-level results.  
+Here we show an example for population-level results:
+
+```{r save_sp_results}
+# Ensure output directory exists (if not, create it)
+if (!dir.exists(sp_output_dir)) dir.create(sp_output_dir, recursive = TRUE)
+
+# Example: save population-level results
+out_file <- paste0(sp_output_dir, gendist, "_", isl, "_", spp, ".csv")
+write.csv(Slope_pop_df, out_file, row.names = FALSE)
+
+out_file
+```
+
+If you want to analyse multiple species, run this document for each species (changing `spp`, `sp`, `isl`, and file paths as needed).
+
+---
+
+# 10. Combine Sp Values Across Species
+
+Once you have one CSV per species in `sp_output_dir`, you can combine them into a single data frame.  
+This section assumes files are named as above: `<gendist>_<island>_<species>.csv`.
+
+## 10.1 Define seed-dispersal groups (example)
+
+Adapt these vectors to your own species and dispersal modes.
+
+```{r dispersal_groups}
+# Example: define which species are short- vs long-distance dispersers
+short_distance_species <- c("sp1", "sp2")  # replace with real codes
+long_distance_species  <- c("sp3", "sp4")  # replace with real codes
+```
+
+## 10.2 Option 1 – Use mean Sp per species
+
+```{r combine_sp_mean}
+# List all CSV files in the Sp results directory
+files <- list.files(sp_output_dir, pattern = "\\.csv$", full.names = TRUE)
+
+# Optionally filter by island
+files <- files[grepl(isl, files)]
+
+# Initialise results data frame
+sp_df_mean <- data.frame(sp   = character(),
+                         Sp   = numeric(),
+                         type = character(),
+                         stringsAsFactors = FALSE)
+
+for (file in files) {
+  df_sp <- read.csv(file)
+
+  # Extract species code from file name: <gendist>_<island>_<species>.csv
+  fname   <- tools::file_path_sans_ext(basename(file))
+  parts   <- strsplit(fname, "_")[[1]]
+  sp_name <- parts[length(parts)]
+
+  # Skip if Sp column is missing
+  if (!"Sp" %in% colnames(df_sp)) next
+
+  # Mean Sp value
+  sp_value <- mean(df_sp$Sp, na.rm = TRUE)
+
+  # Assign dispersal type based on species
+  type <- dplyr::case_when(
+    sp_name %in% short_distance_species ~ "short",
+    sp_name %in% long_distance_species  ~ "long",
+    TRUE                                ~ "other"
+  )
+
+  # Append to final data frame
+  sp_df_mean <- rbind(sp_df_mean,
+                      data.frame(sp   = sp_name,
+                                 Sp   = sp_value,
+                                 type = type,
+                                 stringsAsFactors = FALSE))
+}
+
+head(sp_df_mean)
+```
+
+## 10.3 Option 2 – Keep all Sp values per species
+
+```{r combine_sp_all}
+# Re-use 'files' defined above
+sp_df_all <- data.frame(sp   = character(),
+                        Sp   = numeric(),
+                        type = character(),
+                        stringsAsFactors = FALSE)
+
+for (file in files) {
+  df_sp <- read.csv(file)
+
+  # Extract species code from file name
+  fname   <- tools::file_path_sans_ext(basename(file))
+  parts   <- strsplit(fname, "_")[[1]]
+  sp_name <- parts[length(parts)]
+
+  if (!"Sp" %in% colnames(df_sp)) next
+
+  # Remove NA values
+  sp_values <- df_sp$Sp[!is.na(df_sp$Sp)]
+  if (length(sp_values) == 0) next
+
+  # Dispersal type
+  type <- dplyr::case_when(
+    sp_name %in% short_distance_species ~ "short",
+    sp_name %in% long_distance_species  ~ "long",
+    TRUE                                ~ "other"
+  )
+
+  tmp_df <- data.frame(sp   = sp_name,
+                       Sp   = sp_values,
+                       type = type,
+                       stringsAsFactors = FALSE)
+
+  sp_df_all <- rbind(sp_df_all, tmp_df)
+}
+
+# Optionally save combined results
+# write.csv(sp_df_all,
+#           paste0(sp_output_dir, gendist, "_", isl, "_all_species.csv"),
+#           row.names = FALSE)
+
+head(sp_df_all)
+```
+
+---
+
+# 11. Visualisation of Sp
+
+## 11.1 Boxplot of Sp by dispersal type
+
+```{r boxplot_sp}
+# Make sure 'type' is a factor
+sp_df_all$type <- factor(sp_df_all$type,
+                         levels = c("short", "long", "other"))
+
+# Simple base R boxplot
+boxplot(Sp ~ type,
+        data = sp_df_all,
+        main = "",
+        xlab = "Seed-dispersal mode",
+        ylab = "Sp")
+```
+
+## 11.2 Log-transform Sp (optional)
+
+Sometimes Sp values can span several orders of magnitude.  
+Here we apply a simple log-transform after adding a constant to make all values positive.
+
+```{r log_transform}
+sp_df_all$Sp_nonlog <- sp_df_all$Sp
+
+# Add a constant to avoid log of zero or negative values (adapt if needed)
+offset <- abs(min(sp_df_all$Sp_nonlog, na.rm = TRUE)) + 1
+sp_df_all$Sp_nonlog <- sp_df_all$Sp_nonlog + offset
+
+sp_df_all$Sp_log <- log(sp_df_all$Sp_nonlog)
+
+summary(sp_df_all$Sp_log)
+```
+
+```{r boxplot_sp_log}
+boxplot(Sp_log ~ type,
+        data = sp_df_all,
+        main = "",
+        xlab = "Seed-dispersal mode",
+        ylab = "log(Sp + offset)")
+```
+
+---
+
+# 12. Statistical Comparisons Among Dispersal Modes
+
+Below are several common approaches to test for differences in Sp between groups.
+
+## 12.1 ANOVA
+
+```{r anova_sp}
+anova_model <- aov(Sp ~ type, data = sp_df_all)
+summary(anova_model)
+```
+
+## 12.2 t-test (two groups)
+
+If you only want to compare two dispersal modes (e.g. `"short"` vs `"long"`), filter the data first.
+
+```{r ttest_sp}
+sp_two <- sp_df_all %>%
+  dplyr::filter(type %in% c("short", "long"))
+
+sp_two$type <- droplevels(sp_two$type)
+
+t.test(Sp ~ type, data = sp_two)
+```
+
+## 12.3 Wilcoxon rank-sum test
+
+```{r wilcox_sp}
+wilcox.test(Sp ~ type, data = sp_two, exact = FALSE)
+```
+
+## 12.4 Permutation test on difference in means
+
+```{r permutation_test}
+perm_test <- function(data, group_col, value_col, n_perm = 999) {
+  # Observed difference in group means (absolute value)
+  observed_diff <- abs(diff(tapply(data[[value_col]], data[[group_col]], mean, na.rm = TRUE)))
+
+  perm_diffs <- numeric(n_perm)
+
+  for (i in 1:n_perm) {
+    permuted_group <- sample(data[[group_col]])
+    perm_diffs[i] <- abs(diff(tapply(data[[value_col]], permuted_group, mean, na.rm = TRUE)))
+  }
+
+  p_value <- (sum(perm_diffs >= observed_diff) + 1) / (n_perm + 1)
+
+  list(observed_diff = observed_diff, p_value = p_value)
+}
+
+permutation <- perm_test(sp_two, "type", "Sp", n_perm = 999)
+print(permutation)
+```
+
+## 12.5 Kolmogorov–Smirnov test
+
+Here we compare the distributions of Sp between two dispersal groups.
+
+```{r ks_test}
+group1 <- sp_two$Sp[sp_two$type == "short"]
+group2 <- sp_two$Sp[sp_two$type == "long"]
+
+ks_result <- ks.test(group1, group2)
+print(ks_result)
+```
+
+---
+
+# 13. Notes and Tips
+
+- Carefully check that **individual/population IDs** match between your genetic and coordinate files.  
+- Make sure your **distance metric** is appropriate for your ploidy and marker type.  
+- The choice of `D.min` and `D.max` can strongly influence the estimated Sp; explore different values.  
+- For small sample sizes, interpret p-values with caution.  
