@@ -20,8 +20,7 @@ Although some methods address dosage and genotyping issues (e.g. Bruvo distance;
 We first assessed whether the polyploid species follow mainly disomic or tetrasomic inheritance patterns by examining the **inbreeding coefficient (FIS)** across loci. Under strict disomic inheritance (as expected in allotetraploids), loci often show fixed heterozygosity, leading to negative FIS values, while deviations from this pattern are indicative of tetrasomic inheritance (Meirmans & Van Tienderen, 2012).
 
 **Implementation:**
-FIS was calculated at the “locus × population” level in GenoDive v3.06 (Meirmans, 2020), which also tests for Hardy–Weinberg equilibrium (HWE). To reduce confounding effects of population structure:
-1) a Lynch distance matrix was computed, 2) neighbor-joining trees were generated to visualize genetic clustering. These analyses were performed in section 6 of the R code *polyploid_analysis.Rmd*.
+FIS was calculated at the “locus × population” level in GenoDive v3.06 (Meirmans, 2020), which also tests for Hardy–Weinberg equilibrium (HWE). To reduce confounding effects of population structure: 1) a Lynch distance matrix was computed, 2) neighbor-joining trees were generated to visualize genetic clustering. These analyses were performed in section 6 of the R code *polyploid_analysis.Rmd*.
 
 
 ### Step 2 – Isolocus assignment with *polysat* in R
