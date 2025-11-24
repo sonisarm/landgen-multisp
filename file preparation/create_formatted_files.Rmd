@@ -1,0 +1,135 @@
+---
+title: "Rscript_create_format_files"
+output: Create formatted files from STRand. Formatted files: Genodive, Structure, Genodive, SPAGedi
+date: "2025-11-24"
+---
+
+This R Markdown script converts microsatellite data from STRand (species.csv) into several standard population-genetic formats. It loads the data into a Genambig object, sets ploidy (pl) and the number of repeat units per microsatellite locus (usatnt), and assigns sample names. From this, it creates a genind object and automatically exports Genepop, STRUCTURE, Genodive and SPAGeDi files (with and without spatial coordinates) for downstream analyses.
+
+# Load libraries
+```{r setup}
+# libraries
+library(polysat)
+library(adegenet)
+library(poppr)
+library(tidyr)
+library(readxl) #read excel files
+library(dplyr)
+library(radiator) #dowload genopop files
+
+```
+
+# Load data
+```{r Diploid}
+Genambig <- read.STRand('species.csv', sep = ";", popInSam = FALSE)
+pl <- 2
+sp <- 'species_name'
+usatnt <- c(5, 6, 6, 4, 5, 4, 4, 5, 5, 6)
+
+```
+
+
+# Load data from a polyploid
+```{r Tetraploid}
+Genambig <- read.STRand('species.csv', sep = ";", popInSam = FALSE)
+pl <- 4
+sp <- 'species_name'
+usatnt <- c(2, 3, 3, 6, 6, 2, 4, 5, 2, 6, 3, 3, 3, 3)
+```
+
+In this script, usatnt specifies, for each microsatellite locus, the number of repeat units used to code alleles, and we illustrate its use with Bethencourtia palmensis (diploid) and Cheirolophus teyids (tetraploid) as examples of how to load diploid and polyploid STRand data.
+
+
+# Create formatted files
+Define samples, usatnt and ploidy 
+```{r }
+all_samples <- Samples(Genambig)
+Usatnts(Genambig) <- usatnt
+Ploidies(Genambig) <- pl
+Loci(Genambig)
+
+```
+
+
+Create Genind:
+```{r}
+Genind <- gendata.to.genind(Genambig, samples = Samples(Genambig), loci = Loci(Genambig))
+
+```
+
+
+
+Write Genpop (for gstudio)
+```{r Genpop}
+
+Genopop <-genind2genpop(Genind,
+  pop = Genind@pop,
+  quiet = FALSE,
+  process.other = FALSE,
+  other.action = mean)
+
+writeGenepop(Genopop, paste0( sp, "_genepop.txt"), pop = TRUE)
+
+```
+
+Write structure
+```{r STRUCTURE}
+write.Structure(Genambig, ploidy = pl, file=file.path("..", "..", "Data", "Stru", sp), writepopinfo = TRUE, missingout = -9)
+
+```
+
+Write Genodive
+```{r GENODIVE}
+
+write.GenoDive(Genambig, digits = 3, file = file.path("..", "..", "Data", "Genodive", sp),
+               samples = Samples(Genambig), loci = Loci(Genambig))
+
+```
+
+
+Write Spagedi
+```{r SPAGEDI without coordinates}
+# without coordinates
+
+write.SPAGeDi(object = Genambig,
+              samples = Samples(Genambig),
+              loci = Loci(Genambig),
+              allelesep = "/",
+              digits = 3,
+              file = file.path(paste0("../../Data/Spagedi/", sp, "_SPAGeDi.txt")))
+
+
+```
+
+```{r SPAGEDI with coordinates}
+
+ind <- Samples(Genambig)
+coord <- read_xlsx('coord.xlsx', sheet='All')
+Species.data <- coord %>% dplyr::filter(ID %in% ind) # filter only those of interest
+
+Species.data <- Species.data %>% dplyr::select(ID, X, Y)%>%
+  tibble::column_to_rownames("ID")
+
+Samples(Genambig) == Species.data$ID
+
+write.SPAGeDi(object = Genambig,
+              samples = Samples(Genambig),
+              loci = Loci(Genambig),
+              allelesep = "/",
+              digits = 3,
+              file = file.path(paste0("../../Data/Spagedi/", sp, "_SPAGeDiCoord.txt")),
+              spatcoord=Species.data)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
