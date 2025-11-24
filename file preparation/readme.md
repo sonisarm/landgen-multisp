@@ -5,7 +5,6 @@ This repository contains small helper scripts to convert raw microsatellite (SSR
 ## Files
 
 ### *`create_formatted_files.Rmd`*
-
 R Markdown workflow using polysat and related packages to:
 - Import STRand-formatted microsatellite data into a `Genambig` object.
 - Export the same dataset into several downstream formats:
@@ -13,14 +12,11 @@ R Markdown workflow using polysat and related packages to:
   - STRUCTURE
   - Genodive
   - SPAGeDi (with and without spatial coordinates)
-
 Intended as a generic template that users can adapt by changing paths, species codes, ploidy and locus information.
 
 
 ### *`STRand-maker.py`*
-
 Python script to convert raw Excel genotype files into STRand format.
-
 - **Input:** `.xlsx` files with one column per allele plus metadata columns (e.g. `Ind`, `Pop`, `X`, `Y`), listed in a control text file (`STRand-input-files.txt`).
 - **Process:**  
   - Groups columns by ploidy.
@@ -28,9 +24,7 @@ Python script to convert raw Excel genotype files into STRand format.
 - **Output:** Per-dataset CSV and Excel files in STRand-compatible format.
 
 ### *`Spagedi-maker.py`*
-
-Python script to convert Excel microsatellite data into a **SPAGeDi**-compatible TXT file.:contentReference[oaicite:1]{index=1}  
-
+Python script to convert Excel microsatellite data into a **SPAGeDi**-compatible TXT file.  
 - **Input:** `.xlsx` file with columns for individual ID, population, coordinates (`X`, `Y`) and one column per allele.
 - **Process:**  
   - Detects loci and ploidy from the structure of the file.
@@ -42,5 +36,3 @@ Python script to convert Excel microsatellite data into a **SPAGeDi**-compatible
 
 - **R** (for `create_formatted_files.Rmd`) with packages: `polysat`, `adegenet`, `poppr`, `tidyr`, `readxl`, `dplyr`, `radiator`, etc.
 - **Python 3** with `pandas` (and `openpyxl` for reading Excel files).
-
-Edit paths and parameters in each script to point to your own data before running.
