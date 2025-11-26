@@ -30,6 +30,14 @@ This project uses Python with the following libraries:`PyPDF2`, `pandas` and `op
 
 To run the python code in a powershell terminal, run as follosws: 
 
+### File overview 
+- **`extract_wind_data.py`**: Main Python script. Reads a wind-layer PDF, parses the numerical data (wind speed, Weibull parameters, direction, etc.), and exports the results to an Excel file.
+
+- **Wind-layer PDF(s)** (e.g. `GomeraTenerife5.pdf`): Input files downloaded from the wind-resource viewer. Each PDF contains the numerical wind data for a specific island area or cell.
+
+- **Output Excel file(s)** (e.g. `GomeraTenerife5.xlsx`): Generated automatically by the script. Each Excel file contains the cleaned, tabular version of the data extracted from the corresponding PDF.
+
+- **`Moraga_2010_*` (PDF)**: Scientific publication describing the methodology and background of the wind-resource layers used in this project (Moraga, 2010). This provides the scientific context and validation for the wind-layer data.
 
 ### Running the script
 To extract wind data from a PDF, run the script from a PowerShell terminal (for example inside VS Code) as follows:
