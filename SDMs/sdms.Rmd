@@ -1,0 +1,421 @@
+---
+title: "Species distribution models"
+output: Species distribution modeling under present and future scenarios
+date: "2025-11-26"
+
+params:
+  species: "bpalm"      # species name
+  gcm: "MRI-ESM2-0"          # climate model name
+  ssp: "ssp585"              # eg. ssp126, ssp370, ssp585
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+# Load packages ---------------------------------------------------------------
+
+# Modeling and spatial data analysis
+library(biomod2)
+library(terra)
+library(sp)
+library(raster)
+library(sf)
+
+# Data analysis
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(gtools)
+library(Hmisc)
+library(caret)
+
+# Visualization
+library(ggplot2)
+library(gridExtra)
+library(viridis)
+library(RColorBrewer)
+library(rasterVis)
+library(adegraphics)
+
+# Statistical analysis and modeling
+library(ade4)
+library(adehabitatHS)
+library(gam)
+library(earth)
+library(rpart)
+library(mda)
+library(nnet)
+library(randomForest)
+library(gbm)
+library(MASS)
+library(pROC)
+
+# other packages
+library(knitr)
+library(rgbif)
+library(corrgram)
+library(reshape2)
+library(readxl) # read xlsx files
+library(ggrepel)
+
+options(stringsAsFactors = FALSE)
+
+```
+
+# 1. Environmental data (climate + topography + snow)
+
+Load raster with environmental data and, optionally, crop into vectors size
+```{r env_data}
+env_all <- rast("raster.tif")
+
+# Optional: crop to a vector extent
+vect <- vect("vector.shp")
+env_crop <- crop(env_all, tflp)
+
+```
+
+# 2. Species coordinates
+
+Load general coordinate file and filter coordinates only those from your species of interest
+```{r coords_main}
+sp <- "Species name"
+coord_all <- read_xlsx('coord.xlsx', sheet = 'sheet1')
+Species.data <- coord_all %>%  dplyr::filter(Species == sp)
+
+# Basic coordinate data frame (numeric)
+coords_main <- Species.data %>%
+  dplyr::select(X, Y) %>%
+  dplyr::mutate(across(c(X, Y), as.numeric))
+
+```
+
+
+Optional: If the species has extra shapefiles with occurrences, load them and merge them with coordinates
+```{r coords_shp}
+coords_all <- coords_main
+
+if (isTRUE(current_species$has_shp[[1]])) {
+  shp_dir <- file.path("..", "SDM", "Coordfiles", species)
+  if (dir.exists(shp_dir)) {
+    shp_files <- list.files(shp_dir, pattern = "\\.shp$", full.names = TRUE)
+    if (length(shp_files) > 0) {
+      shp_coords <- data.frame(X = numeric(), Y = numeric(), file = character())
+
+      for (file in shp_files) {
+        shp <- st_read(file, quiet = TRUE)
+        if (nrow(shp) == 0) next
+        coord_mat <- st_coordinates(shp)
+        df <- data.frame(X = coord_mat[,"X"], Y = coord_mat[,"Y"], file = basename(file))
+        shp_coords <- rbind(shp_coords, df)
+      }
+
+      shp_coords <- shp_coords %>% dplyr::select(-file)
+      shp_coords <- shp_coords %>% dplyr::mutate(across(c(X, Y), as.numeric))
+
+      coords_all <- rbind(coords_main, shp_coords) %>%
+        distinct()
+    }
+  }
+}
+
+coords_all <- coords_all %>% dplyr::mutate(across(c(X, Y), as.numeric))
+
+nrow(coords_main); nrow(coords_all)
+```
+
+# 3. Extract environmental values and correlation analysis
+
+coords_all if you have added shp file
+coords_main if you do not have shp file added
+```{r env_at_points}
+# Extract environmental values at species coordinates
+predictors <- raster::extract(env_crop, coords_all) %>%
+  as.data.frame() %>%
+  na.omit()
+
+```
+
+
+Plot PCA on predictors and a correlation matrix to investigate about correlation in the vairables and choose most appropriate variables
+```{r correlation_analysis}
+predictors <- predictors[, sapply(predictors, is.numeric)]
+pca_predict <- dudi.pca(predictors, scannf = FALSE, nf = 2)
+
+# PCA correlation circle
+s.corcircle(pca_predict$co, clabel = 0.7, cgrid = 0.2, full = FALSE,
+            sub = "Correlation circle - predictors", csub = 1.5,
+            possub = "bottomright", box = TRUE)
+
+# Correlation matrix
+cor_matrix <- cor(predictors_at_points, use = "complete.obs")
+ 
+# corrgram
+corrgram(predictors_at_points, order = TRUE, main = "Predictors correlation",
+         lower.panel = panel.shade, upper.panel = panel.pie, text.panel = panel.txt)
+
+```
+
+# 4. Select variables for SDM and save final raster
+
+At this point, you have to define which variables you will use and save to var object. An example is included below
+```{r select_vars}
+var <- c("BIO-01", "BIO-12")
+
+# Keep only selected variables
+env_final <- subset(env_crop, var)
+names(env_final)
+
+# Optionally: save 
+writeRaster(env_final, paste0("env_", species, ".tif"),overwrite = TRUE)
+```
+
+# 5. Background points and BIOMOD2 data formatting
+
+Load raster saved in the previous step (optional)
+```{r load raster}
+# Load species-specific raster
+env_final <- rast(paste0("env_", species, ".tif")) 
+names(env_final) <- var
+```
+
+Generate random background points within the valid cells
+```{r background_points}
+Mask <- prod(env_final)
+Valid.Cells <- which(!is.na(values(Mask)))
+set.seed(42)
+Points.random <- sample(Valid.Cells, 10000)
+Coords <- terra::xyFromCell(Mask, Points.random)
+Background.xy <- as.data.frame(Coords)
+
+dim(Background.xy)
+```
+
+Clean species coordinates: keep only points with non-NA environment
+```{r biomod_formatting}
+Species.env <- raster::extract(env_final, coords_all)
+Species.env2 <- cbind(coords_all, Species.env) %>%
+  na.omit()
+
+XY <- Species.env2[, 1:2]
+colnames(XY) <- c("x", "y")
+
+# Save presence points
+write.csv(XY, paste0("presence_", species, ".csv"), row.names = FALSE)
+```
+
+Build presence/background dataset for BIOMOD2
+```{r build_dataset}
+myResp.xy <- rbind(XY, Background.xy)
+names(myResp.xy) <- c("x", "y")
+row.names(myResp.xy) <- seq_len(nrow(myResp.xy))
+
+myResp <- data.frame(pa = c(rep(1, nrow(XY)),
+                            rep(NA, nrow(Background.xy))))
+row.names(myResp) <- seq_len(nrow(myResp.xy))
+
+myExpl <- terra::extract(env_final, myResp.xy) %>%
+  as.data.frame()
+
+# Remove potential ID column
+myExpl <- myExpl[ , !(names(myExpl) %in% "ID")]
+
+head(myExpl)
+```
+
+
+# 6. Run BIOMOD2 models (current climate)
+
+```{r biomod_models, message=FALSE}
+
+# Set working directory so BIOMOD2 saves outputs where expected
+setwd("mypath")
+
+# Format data for BIOMOD2
+myBiomodData <- BIOMOD_FormatingData(
+  resp.var  = myResp,
+  resp.xy   = myResp.xy,
+  expl.var  = myExpl,
+  resp.name = species,
+  PA.nb.rep = 1,
+  PA.nb.absences = nrow(Background.xy),
+  PA.strategy = "random"
+)
+
+# Run single models
+myBiomodModelOut <- BIOMOD_Modeling(
+  bm.format   = myBiomodData,
+  modeling.id = "AllModels",
+  models      = c("GBM", "RF", "GLM"),
+  CV.strategy = "random",
+  CV.nb.rep   = 10,
+  CV.perc     = 0.8,
+  weights     = NULL,
+  var.import  = 3,
+  metric.eval = c("ROC", "TSS"),
+  scale.models = FALSE,
+  do.progress  = TRUE,
+  prevalence   = 0.5,
+  seed.val     = 42
+)
+
+# Ensemble modeling
+myBiomodEM.ROC <- BIOMOD_EnsembleModeling(
+  bm.mod  = myBiomodModelOut,
+  models.chosen = "all",
+  em.by   = "all",
+  em.algo = c("EMwmean"),
+  metric.select        = c("TSS"),
+  metric.select.thresh = c(0.8),
+  var.import  = 3,
+  metric.eval = c("ROC", "TSS", "KAPPA"),
+  seed.val    = 42
+)
+
+```
+
+# 7. Projection and evaluation under current climate
+
+```{r projection_current}
+
+# Project all replicas to the study area
+myBiomodProj <- BIOMOD_Projection(
+  bm.mod       = myBiomodModelOut,
+  new.env      = env_final,
+  proj.name    = "Current",
+  models.chosen = "all"
+)
+
+# Ensemble forecast for current conditions
+BIOMOD_EnsembleForecasting(
+  bm.em   = myBiomodEM.ROC,
+  bm.proj = myBiomodProj,
+  models.chosen  = "all",
+  metric.binary  = "all",
+  metric.filter  = "all"
+)
+```
+
+```{r save projection raster}
+
+# Load ensemble projection raster
+Pred.ROC <- rast(paste0("mypath/", species, "/proj_Current/proj_Current_", species, "_ensemble.tif"))
+
+# Normalize 0–1
+nx <- minmax(Pred.ROC)
+rn <- (Pred.ROC - nx[1,]) / (nx[2,] - nx[1,])
+Pred.ROC <- rn
+
+# Save raster
+terra::writeRaster(Pred.ROC, paste0("mypath/", species, "_Current.tif"))
+
+```
+
+
+Evaluation statistics
+```{r evaluate_current}
+
+myEMeval.replicates <- biomod2::get_evaluations(myBiomodModelOut)
+myEMeval.Consenso   <- get_evaluations(myBiomodEM.ROC)
+
+write.table(myEMeval.replicates,
+            file = paste0("mypath/", species, "_evaluation_all.txt"),
+            row.names = FALSE, col.names = TRUE, sep = ",")
+
+write.table(myEMeval.Consenso,
+            file = paste0("mypath/", species, "_ensemble.txt"),
+            row.names = FALSE, col.names = TRUE, sep = ",")
+
+# Simple plot
+plot(Pred.ROC)
+points(XY, pch = 20, bg = "black", cex = 1)
+```
+
+
+
+```{r save_map_current}
+# Save a PDF map of current suitability
+pdf(paste0("mypath/", species, "_Current.pdf"),width = 11.7, height = 8.3)
+plot(Pred.ROC, legend = TRUE, col = rev(terrain.colors(50)))
+points(XY, pch = 20, bg = "black", cex = 0.7)
+dev.off()
+
+# Save main raster also to SDMoutput
+writeRaster(Pred.ROC,
+            paste0("../SDM/SDMoutput/", species, ".tif"),
+            overwrite = TRUE)
+```
+
+# 8. Future projections
+
+```{r future_env}
+
+# Build path for future climatic variables
+future_path <- file.path("mypath", gcm, ssp, "bio")
+
+newclim_files <- list.files(path = future_path,
+                            pattern = "\\.tif$", full.names = TRUE)
+
+
+NewClim <- rast(newclim_files)
+names(NewClim) <- sub(".*(bio_\\d+).*", "\\1", names(NewClim)) # optional, modifies name in raster
+
+# Match variable names with 'var' (using only those present)
+vars_found <- intersect(var, names(NewClim))
+topovar <- var[!grepl("bio", var) & var != "snow_cover"]
+
+# Topography from current env_final
+topo <- crop(env_final[[topovar]], NewClim)
+topo <- resample(topo, NewClim)
+
+NewClim <- c(NewClim[[vars_found]], topo)
+names(NewClim)
+```
+
+```{r project_future}
+# Scenario label
+tmp <- substr(gcm, 1, 3)
+scenario <- paste0(tmp, "-", ssp)
+
+setwd("mypath")
+
+myBiomodProjScenario <- BIOMOD_Projection(
+  bm.mod       = myBiomodModelOut,
+  new.env      = NewClim,
+  proj.name    = ssp, # scenario
+  models.chosen = "all"
+)
+
+BIOMOD_EnsembleForecasting(
+  bm.em   = myBiomodEM.ROC,
+  bm.proj = myBiomodProjScenario,
+  models.chosen   = "all",
+  metric.binary   = "all",
+  metric.filter   = "all"
+)
+```
+
+```{r future_raster}
+Pred.ROC.ssp <- rast(paste0("mypath", species,"/proj_", ssp, "/proj_",
+                                 ssp, "_", species, "_Ensemble.tif"))
+
+# Normalize 0–1
+nx <- minmax(Pred.ROC.ssp)
+rn <- (Pred.ROC.ssp - nx[1,]) / (nx[2,] - nx[1,])
+Pred.ROC.ssp <- rn
+
+# Crop to the same extent as current  (optional) 
+present <- rast(paste0(".mypath", species, "_Current.tif"))
+Pred.ROC.ssp <- crop(Pred.ROC.ssp, present)
+
+# Save raster
+terra::writeRaster(Pred.ROC.ssp, paste0("mypath/", species, "_", ssp, ".tif"))
+
+# Simple visual comparison
+plot(present, main = paste(species, "Current"))
+plot(Pred.ROC.ssp, main = paste(species, ssp))
+```
+
+```{r future_map_pdf}
+pdf(paste0("mypath/", species, "_", ssp, ".pdf"))
+plot(Pred.ROC.ssp, legend = TRUE,
+     main = paste(species, ssp))
+dev.off()
+```
