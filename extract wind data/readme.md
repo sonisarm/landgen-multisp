@@ -1,11 +1,18 @@
+## Canary Islands Wind Mapping (2016)
+Dataset promoted by the Ministry for Ecological Transition and developed by the Technological Institute of the Canary Islands (ITC) and AWS Truepower, SLU. It includes wind speed, power density, and Weibull parameters at 40, 60, 80, and 100 meters, with a 50x50 m spatial resolution, derived from the MASS mesoscale atmospheric model. 
 
-## Extract wind data from a PDF 
+The shapefiles can be obtained from the following link: <https://opendata.sitcan.es/dataset/cartografia-eolica-de-canarias-2016>. These shapefiles contain coordinates, mean wind speeds, power density, Weibull parameters, and wind direction frequencies across 16 sectors (wind rose). These layers are GIS-ready, unlike the PDFs available on the ITC portal (see below). This repository contains the R Markdown script `wind_value_rasterization.Rmd`, which processes wind data for the Canary Islands. Specifically, this performs the following tasks:
+- Loads the Canary Islands wind shapefiles
+- Extracts *mean wind speed* at 40-m above ground (`SPD40`) and *wind turbulence* (`WEIBK`).
+- Rasterizes the data at 100‑m resolution to match the resolution of the CanaryClim dataset.
+- Produces raster files ready for subsequent ResistanceGA analyses or other spatial modeling workflows.
+- 
+
+## Optional: Extract wind data from raw data files
 This directory contains a Python script to extract wind data from PDF files and export the results to Excel ('.xlsx'). 
 
 ### Origin of wind layers 
 The wind data comes from the official Canary Islands wind-resource viewer: 
-
-
 To install packages necessary for this python code run as follows in VScode terminal:
 1. Go to: <http://recursoeolico.itccanarias.org/>
 
