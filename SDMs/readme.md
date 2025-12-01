@@ -16,7 +16,7 @@ This repository contains scripts for modeling species distributions under curren
 * Key packages: `biomod2`, `terra`, `sf`, `raster`, `dplyr`, `ggplot2`, `randomForest`, `gbm`, `caret`, `pROC`
 
 **Usage**
-1. Set species and scenario parameters in the script or R Markdown:
+1. Set species and scenario parameters in the script or R Markdown, for example:
 ```r
 species <- "bpalm"
 gcm     <- "MRI-ESM2-0"
