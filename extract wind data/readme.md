@@ -6,7 +6,6 @@ The shapefiles can be obtained from the following link: <https://opendata.sitcan
 - Extracts *mean wind speed* at 40-m above ground (`SPD40`) and *wind turbulence* (`WEIBK`).
 - Rasterizes the data at 100‑m resolution to match the resolution of the CanaryClim dataset.
 - Produces raster files ready for subsequent ResistanceGA analyses or other spatial modeling workflows.
-- 
 
 ## Optional: Extract wind data from raw data files
 This directory contains a Python script to extract wind data from PDF files and export the results to Excel ('.xlsx'). 
