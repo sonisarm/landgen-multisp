@@ -4,14 +4,14 @@ The repository accompanies a multi-species landscape genetics study of eight hig
 
 The following diagram provides an overview of the workflow for the analysis performed. The highlighted steps correspond to those for which code is included in this GitHub repository, and the analysis code is organized within the respective folders.
 
-Additionally to the highlighted analyses, there are other analyses that include a directory in this repository which are:
-- **file preparation**: explanation
-- **extraction of wind values**: explanation.
-
-- 
 <img src="Supp_framework.png" alt="framework" width="1000">
 
 
 
 Explanation of directories of highlighted analyses in the diagram:
 ....
+
+
+Additionally to the highlighted analyses, there are other analyses that include a directory in this repository which are:
+- **file preparation**: explanation
+- **extraction of wind values**: explanation.
