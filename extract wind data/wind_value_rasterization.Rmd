@@ -1,0 +1,45 @@
+---
+title: "Wind value rasterization"
+output: Raster containing wind-related values
+date: "2025-12-01"
+---
+
+
+This script rasterizes wind-related variables for the Canary Islands, including mean wind speed (`SPD40`) and wind turbulence (`WEIBK`), converting point shapefile data into raster grids at a 100 m resolution. The resulting rasters can be used for spatial analysis or as input for species distribution models and environmental modeling.
+
+
+Load libraries
+
+```{r}
+library(terra)
+library(sf)
+
+```
+
+
+Load data
+```{r load shp file}
+
+island <- "GranCanaria" # Other islands: LaPalma, LaGomera, Tenerife, ElHierro
+shp <- st_read(paste0("pathtofile/SHP40_", island, ".shp"))
+
+```
+
+Rasterize mean wind speed (m/s)
+```{r}
+
+r <- rast(shp, resolution = 100)  #create empty raster
+wind_speed <- rasterize(shp, r, field = "SPD40")
+writeRaster(wind_speed, paste0(island, "_speed.tif"), overwrite = TRUE)
+```
+
+Rasterize wind turbulence (Weibk distribution)
+```{r}
+
+r <- rast(shp, resolution = 100)  #create empty raster
+weibk <- rasterize(shp, r, field = "WEIBK ")
+writeRaster(weibk, paste0(island, "_weibk.tif"), overwrite = TRUE)
+
+```
+
+
