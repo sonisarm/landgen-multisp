@@ -3,7 +3,7 @@ Dataset promoted by the Ministry for Ecological Transition and developed by the 
 
 The shapefiles can be obtained from the following link: <https://opendata.sitcan.es/dataset/cartografia-eolica-de-canarias-2016>. These shapefiles contain coordinates, mean wind speeds, power density, Weibull parameters, and wind direction frequencies across 16 sectors (wind rose). These layers are GIS-ready, unlike the PDFs available on the ITC portal (see below). This repository contains the R Markdown script `wind_value_rasterization.Rmd`, which processes wind data for the Canary Islands. Specifically, this performs the following tasks:
 - Loads the Canary Islands wind shapefiles
-- Extracts *mean wind speed* at 40-m above ground (`SPD40`) and *wind turbulence* (`WEIBK`).
+- Extracts *mean wind speed* (m/s) at 40-m above ground (`SPD40`) and *wind turbulence* (`WEIBK`).
 - Rasterizes the data at 100‑m resolution to match the resolution of the CanaryClim dataset.
 - Produces raster files ready for subsequent ResistanceGA analyses or other spatial modeling workflows.
 
