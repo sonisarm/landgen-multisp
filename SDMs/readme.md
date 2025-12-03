@@ -22,7 +22,7 @@ species <- "bpalm"
 gcm     <- "MRI-ESM2-0"
 ssp     <- "ssp585"
 ```
-2. Load environmental rasters and species coordinates.
+2. Load environmental rasters and species coordinates (including additional points from Biota/GBIF when needed).
 3. Extract environmental variables at species locations.
 4. Generate background points and format BIOMOD2 datasets.
 5. Run models, evaluate, and create ensemble forecasts.
@@ -34,3 +34,38 @@ ssp     <- "ssp585"
 * `presence_species.csv` – Presence points
 * `species_Current.tif` / `species_ssp585.tif` – Predicted suitability maps
 * Evaluation tables and PDF maps
+
+
+##### Obtaining Additional Occurrence Data (Biota & GBIF)
+For some species, occurrence coordinates may be insufficient (e.g., *Bethencourtia palmensis*). In these cases, additional occurrence data can be obtained from Biota and GBIF.
+
+**Biota**
+Biota is the biodiversity database of the Canary Islands, providing detailed information on species distributions, habitats, and conservation status. It allows researchers and the public to access occurrence data, maps, and other ecological information for scientific and management purposes. The resolution of this data is 500-m. Data from Biota can be downloaded using the following approach:
+* Visit the Biota portal:<[biota](https://www.biodiversidadcanarias.es/biota/>
+* Navigate to Data / Análisis territorial.
+* Click the three horizontal lines on the top left. Under Capas activas, add a new analysis layer (nueva capa de análisis).
+* Give your layer a name. In the next step, search for the species you are interested in.
+* In the Distribution tab (pestaña Distribución), select precision 1.
+* Save your layer. Then, in the Operaciones section, export the occurrence points in shapefile or TXT format.
+
+
+**GBIF** 
+GBIF is ... 
+* Visit the BGIF portal:<[GBIF]([https://www.biodiversidadcanarias.es/biota/](https://www.gbif.org/es/)>
+* Search for the species you are interested in
+* Explore coordinates in the map and download csv
+
+
+GBIF
+
+Global Biodiversity Information Facility (GBIF) is an international open-access platform that provides species occurrence data from museums, research institutions, and citizen science projects worldwide. It allows researchers to explore and download biodiversity data for scientific analyses and conservation planning.
+
+How to Download Data from GBIF
+
+Visit the GBIF portal: https://www.gbif.org/es/
+
+Search for the species you are interested in.
+
+Explore the occurrence points on the map.
+
+Download the data in CSV format for further use in your analyses.
