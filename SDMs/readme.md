@@ -40,6 +40,7 @@ ssp     <- "ssp585"
 For some species, occurrence coordinates may be insufficient (e.g., *Bethencourtia palmensis*). In these cases, additional occurrence data can be obtained from Biota and GBIF.
 
 **Biota**
+
 Biota is the biodiversity database of the Canary Islands, providing detailed information on species distributions, habitats, and conservation status. It allows researchers and the public to access occurrence data, maps, and other ecological information for scientific and management purposes. The resolution of this data is 500-m. Data from Biota can be downloaded using the following approach:
 * Visit the Biota portal: <https://www.biodiversidadcanarias.es/biota/>
 * Navigate to Data / Análisis territorial.
@@ -50,6 +51,7 @@ Biota is the biodiversity database of the Canary Islands, providing detailed inf
 
 
 **GBIF** 
+
 Global Biodiversity Information Facility (GBIF) is an international open-access platform that provides species occurrence data from museums, research institutions, and citizen science projects worldwide. It allows researchers to explore and download biodiversity data for scientific analyses and conservation planning.
 * Visit the GBIF portal: <https://www.gbif.org/es/>
 * Search for the species you are interested in
