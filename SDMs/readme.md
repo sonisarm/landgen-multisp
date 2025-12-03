@@ -41,7 +41,7 @@ For some species, occurrence coordinates may be insufficient (e.g., *Bethencourt
 
 **Biota**
 Biota is the biodiversity database of the Canary Islands, providing detailed information on species distributions, habitats, and conservation status. It allows researchers and the public to access occurrence data, maps, and other ecological information for scientific and management purposes. The resolution of this data is 500-m. Data from Biota can be downloaded using the following approach:
-* Visit the Biota portal:<[biota](https://www.biodiversidadcanarias.es/biota/>
+* Visit the Biota portal: <https://www.biodiversidadcanarias.es/biota/>
 * Navigate to Data / Análisis territorial.
 * Click the three horizontal lines on the top left. Under Capas activas, add a new analysis layer (nueva capa de análisis).
 * Give your layer a name. In the next step, search for the species you are interested in.
@@ -50,22 +50,8 @@ Biota is the biodiversity database of the Canary Islands, providing detailed inf
 
 
 **GBIF** 
-GBIF is ... 
-* Visit the BGIF portal:<[GBIF]([https://www.biodiversidadcanarias.es/biota/](https://www.gbif.org/es/)>
-* Search for the species you are interested in
-* Explore coordinates in the map and download csv
-
-
-GBIF
-
 Global Biodiversity Information Facility (GBIF) is an international open-access platform that provides species occurrence data from museums, research institutions, and citizen science projects worldwide. It allows researchers to explore and download biodiversity data for scientific analyses and conservation planning.
+* Visit the BGIF portal: <https://www.gbif.org/es/>
+* Search for the species you are interested in
+* Explore the occurrence points on the map and download the data for further use in your analyses
 
-How to Download Data from GBIF
-
-Visit the GBIF portal: https://www.gbif.org/es/
-
-Search for the species you are interested in.
-
-Explore the occurrence points on the map.
-
-Download the data in CSV format for further use in your analyses.
