@@ -51,7 +51,7 @@ Biota is the biodiversity database of the Canary Islands, providing detailed inf
 
 **GBIF** 
 Global Biodiversity Information Facility (GBIF) is an international open-access platform that provides species occurrence data from museums, research institutions, and citizen science projects worldwide. It allows researchers to explore and download biodiversity data for scientific analyses and conservation planning.
-* Visit the BGIF portal: <https://www.gbif.org/es/>
+* Visit the GBIF portal: <https://www.gbif.org/es/>
 * Search for the species you are interested in
 * Explore the occurrence points on the map and download the data for further use in your analyses
 
