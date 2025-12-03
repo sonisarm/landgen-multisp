@@ -36,7 +36,7 @@ ssp     <- "ssp585"
 * Evaluation tables and PDF maps
 
 
-#### Obtaining Additional Occurrence Data (Biota & GBIF)
+#### Obtaining additional occurrence data (Biota & GBIF)
 For some species, occurrence coordinates may be insufficient (e.g., *Bethencourtia palmensis*). In these cases, additional occurrence data can be obtained from Biota and GBIF.
 
 **Biota**
