@@ -8,9 +8,9 @@ The typical execution order is:
 2. **Run single-variable resistance optimization** (one raster at a time; produces `*_one.rda` + bootstrap results)
 3. **Run model comparison** (collects all single-variable outputs; produces `AIC.rda`)
 
-#### Running workflow (recommended order)
+### Running workflow (recommended order)
 
-##### Step 1) Raster preparation
+#### Step 1) Raster preparation
 - **`raster_preparation.Rmd`**: prepares environmental layers so they are suitable for resistance modeling (same projection, cell size, extent; consistent `NA` handling; exports to ASCII grids for downstream use). Expected output: One ASCII grid per variable, e.g. `bio1.asc`, `bio2.asc`, `wspeed.asc`, etc.
 Run the raster preparation script to ensure all rasters are:
 - in the same CRS
@@ -19,7 +19,7 @@ Run the raster preparation script to ensure all rasters are:
 - have consistent `NA` / mask treatment
 Then export each variable as an ASCII grid (`.asc`) used by the modeling scripts.
 
-##### 2) Single-variable resistance surface modeling (one raster per run)
+#### Step 2) Single-variable resistance surface modeling (one raster per run)
 - **`resistance_single_variable.R`**: fits a **single** resistance layer per run. The layer name is passed as a command-line argument (`var <- args[1]`). For a thorough explanation of this code, please see below.
 What it does:
 - Loads one raster layer
@@ -40,7 +40,7 @@ On HPC, this code is executed through **`runsingle.slurm`**, which should:
 - request resources (CPUs/memory/time)
 - call `Rscript resistance_single_variable.R <var>
 
-##### 3) Compare models (after all single-variable runs finish)
+#### Step 3) Compare models (after all single-variable runs finish)
 - **`comparison.R`**  
   Loads multiple `*_one.rda` single-variable results, concatenates their effective-distance matrices and parameter tables, and runs `Resist.boot()` across models to compare support (AIC-based bootstrap). 
 
@@ -56,6 +56,15 @@ On HPC, this code is executed through **`runsingle.slurm`**, which should:
 - `AIC.rda`: model-comparison bootstrap results (relative support across candidate single-variable resistance surfaces).
 
 On HPC, this code is executed through **`comparison.slurm`**.
+
+
+#### Step 4) Read results
+Output files are saved as RDA (.rda) files, which are binary R data files (not plain text). To access the results, load the file in R and assign the stored object to a variable (you can then inspect it or convert relevant components to a table/data frame).
+```
+results <- get(load("../../ResistanceGA/Output/AIC.bpalm.pseudorepl.rda"))
+```
+
+
 
 ---
 #### Explanation of resistance surface modeling code (`resistance_single_variable.R`)
