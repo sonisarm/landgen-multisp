@@ -98,13 +98,13 @@ Finally, the model is bootstrapped: `BOOTS.Slope_one <- Resist.boot(..., dist.ma
 The comparison script repeats a similar bootstrap procedure across multiple models and saves `AIC.rda`. 
 
 ---
-##### Inputs you must provide (per dataset/species)
+#### Inputs you must provide (per dataset/species)
 The scripts assume:
 - A coordinates file (columns include `ID`, `X`, `Y`)
 - A genetic distance / similarity matrix readable into R (square matrix with rownames matching `ID`)  
 - One or more raster layers exported as ASCII grids (`<var>.asc`) 
 
-##### Outputs and how to interpret them
+#### Outputs and how to interpret them
 **Per-variable outputs**
 - `<var>_one.rda`: optimized single-variable model object (`Slope_one`) fileciteturn9file0  
 - `BOOTS.<var>_one.rda`: bootstrap results for that model fileciteturn9file0  
