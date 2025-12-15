@@ -35,7 +35,8 @@ Expected outputs:
   Bootstrap results for that single-variable model.
 
 Run the same modeling script multiple times, each time passing a different `var` (e.g., `bio1`, `bio2`, `wspeed`, …). The script expects the raster to exist as `<var>.asc`.
-On HPC, this is typically executed through **`runsingle.slurm`**, which should:
+
+On HPC, this code is executed through **`runsingle.slurm`**, which should:
 - request resources (CPUs/memory/time)
 - call `Rscript resistance_single_variable.R <var>
 
@@ -52,118 +53,81 @@ On HPC, this is typically executed through **`runsingle.slurm`**, which should:
 - Runs `Resist.boot(...)` to produce `AIC.boot` and saves it as `AIC.rda`  
 
 **Expected outputs**
-- `AIC.rda`  
-  Model-comparison bootstrap results (relative support across candidate single-variable resistance surfaces).
+- `AIC.rda`: model-comparison bootstrap results (relative support across candidate single-variable resistance surfaces).
 
+On HPC, this code is executed through **`comparison.slurm`**.
 
 ---
-#### Explanation of resistance surface modeling code
-### A) `GA.prep(...)` – set up the genetic algorithm (GA)
-In `resistance_single_variable.R`, the GA configuration is created as:
-
-- `GA.inputs <- GA.prep(method="AIC", ASCII.dir=..., Results.dir=..., select.trans=list("A"))` fileciteturn9file0  
-- `GA.inputs$parallel <- 20` fileciteturn9file0  
-
-**Purpose**
+#### Explanation of resistance surface modeling code (`resistance_single_variable.R`)
+**`GA.prep(...)`** – set up the genetic algorithm (GA). 
+*Purpose*:
 - Defines how ResistanceGA will **transform** raster values into candidate resistance values.
 - Chooses the model-selection criterion (`method="AIC"`) used during optimization.
 - Controls the transformation family (`select.trans=list("A")`).
 - Sets the number of cores for parallel evaluation (`parallel`).
+*Output*: a configuration object (`GA.inputs`) that tells `SS_optim()` what to optimize and how.
 
-**Output**
-- A configuration object (`GA.inputs`) that tells `SS_optim()` what to optimize and how.
-
-
-
-### B) `gdist.prep(...)` – prepare effective-distance calculations + response vector
-The script then prepares the inputs needed for distance modeling:
-
-- `gdist.inputs <- gdist.prep(n.Pops=..., samples=pts, response=lower(gd), method="commuteDistance")` fileciteturn9file0  
-
-**Purpose**
+**`gdist.prep(...)`** – prepare effective-distance calculations + response vector. 
+The script then prepares the inputs needed for distance modeling: `gdist.inputs <- gdist.prep(n.Pops=..., samples=pts, response=lower(gd), method="commuteDistance")`
+*Purpose:*
 - Defines the sampling locations (`samples=pts`)
 - Defines the response variable as the **vector of pairwise genetic distances** (`lower(gd)`)
 - Selects **commute distance** (circuit theory) as the landscape distance measure (`method="commuteDistance"`)
+*Output*: a `gdist.inputs` object used by `SS_optim()` to compute effective distances on each candidate resistance surface.
 
-**Output**
-- A `gdist.inputs` object used by `SS_optim()` to compute effective distances on each candidate resistance surface.
-
----
-
-### C) `SS_optim(...)` – optimize resistance transformation parameters
-Next, the GA is executed:
-
-- `Slope_one <- SS_optim(gdist.inputs=gdist.inputs, GA.inputs=GA.inputs)` fileciteturn9file0  
-
-**Purpose**
+**`SS_optim(...)`** – optimize resistance transformation parameters. 
+Next, the GA is executed: `Slope_one <- SS_optim(gdist.inputs=gdist.inputs, GA.inputs=GA.inputs)` 
+*Purpose:*
 - Iteratively:
   1. transforms the raster into a candidate resistance surface
   2. computes pairwise **commute distances** between points on that surface
   3. fits a model to the pairwise genetic distances
   4. scores the model (AIC)
   5. searches parameter space to minimize AIC (best fit with complexity penalty)
+*Output:* `Slope_one`, which contains (among other objects):
+  - effective-distance matrices (`Slope_one$cd`) 
+  - optimized parameter table (`Slope_one$k`) 
+The script saves it as `<var>_one.rda`. 
 
-**Output**
-- `Slope_one`, which contains (among other objects):
-  - effective-distance matrices (`Slope_one$cd`) fileciteturn9file0  
-  - optimized parameter table (`Slope_one$k`) fileciteturn9file0  
-
-The script saves it as `<var>_one.rda`. fileciteturn9file0
-
----
-
-### D) `Resist.boot(...)` – bootstrap stability / support
-Finally, the model is bootstrapped:
-
-- `BOOTS.Slope_one <- Resist.boot(..., dist.mat=Slope_one$cd, n.parameters=k[,2], sample.prop=0.75, iters=10000, obs=n, genetic.mat=response)` fileciteturn9file0  
-
-**Purpose**
-- Re-samples the data repeatedly (here: 10,000 iterations; 75% subsampling) to assess:
+**`Resist.boot(...)`** – bootstrap stability / support. 
+Finally, the model is bootstrapped: `BOOTS.Slope_one <- Resist.boot(..., dist.mat=Slope_one$cd, n.parameters=k[,2], sample.prop=0.75, iters=10000, obs=n, genetic.mat=response)`
+*Purpose:* re-samples the data repeatedly (here: 10,000 iterations; 75% subsampling) to assess:
   - stability of the relationship between resistance distances and genetic distances
   - uncertainty / robustness of the fitted model
-
-**Output**
-- A bootstrap object saved as `BOOTS.<var>_one.rda`. fileciteturn9file0  
-
-The comparison script repeats a similar bootstrap procedure across multiple models and saves `AIC.rda`. fileciteturn9file3
+*Output:* a bootstrap object saved as `BOOTS.<var>_one.rda`. fileciteturn9file0  
+The comparison script repeats a similar bootstrap procedure across multiple models and saves `AIC.rda`. 
 
 ---
-
-## Inputs you must provide (per dataset/species)
-
+##### Inputs you must provide (per dataset/species)
 The scripts assume:
-- A coordinates file (columns include `ID`, `X`, `Y`) fileciteturn9file0  
-- A genetic distance / similarity matrix readable into R (square matrix with rownames matching `ID`) fileciteturn9file0  
-- One or more raster layers exported as ASCII grids (`<var>.asc`) fileciteturn9file0  
+- A coordinates file (columns include `ID`, `X`, `Y`)
+- A genetic distance / similarity matrix readable into R (square matrix with rownames matching `ID`)  
+- One or more raster layers exported as ASCII grids (`<var>.asc`) 
 
----
-
-## Outputs and how to interpret them
-
-### Per-variable outputs
+##### Outputs and how to interpret them
+**Per-variable outputs**
 - `<var>_one.rda`: optimized single-variable model object (`Slope_one`) fileciteturn9file0  
 - `BOOTS.<var>_one.rda`: bootstrap results for that model fileciteturn9file0  
 
-### Across-model output
+**Across-model output**
 - `AIC.rda`: bootstrap-based model comparison across variables (relative support). fileciteturn9file3
 
+
 ---
-
-## Common pitfalls / troubleshooting
-
+#### Common pitfalls / troubleshooting
 1. **CRS mismatch / points on `NA` cells**
    - If coordinates and rasters are not in the same CRS, extractions and distance calculations can fail (often producing `NA` distances).
 2. **ID alignment**
-   - Always ensure `ID` in coordinates matches the rownames of the genetic matrix; the scripts filter to the intersection of IDs. fileciteturn9file0  
+   - Always ensure `ID` in coordinates matches the rownames of the genetic matrix; the scripts filter to the intersection of IDs.
 3. **`n.Pops` calculation**
-   - The script uses `n.Pops=length(pts)`; depending on object type, this may not equal number of points. fileciteturn9file0  
+   - The script uses `n.Pops=length(pts)`; depending on object type, this may not equal number of points. 
    - A safer pattern is `n.Pops = nrow(coordinates(pts))` after creating `SpatialPoints`.
 4. **“0 (non-NA) cases” inside the GA**
    - Usually means that at some evaluation step there are no valid pairwise observations (often due to misalignment or NA distances).
 
 ---
 
-## Suggested directory convention (example)
+#### Suggested directory convention (example)
 
 ```
 .
@@ -184,6 +148,5 @@ The scripts assume:
     ├── BOOTS.bio1_one.rda
     └── AIC.rda
 ```
-
-Adjust paths in the scripts (`workdir`, raster paths, and input filenames) to match your HPC filesystem layout. fileciteturn9file0
+Warning: adjust paths in the scripts (`workdir`, raster paths, and input filenames) to match your HPC filesystem layout. 
 
