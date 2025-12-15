@@ -1,0 +1,84 @@
+---
+title: "Create raster input"
+description: short R code to create raster inputs for ResistanceGA
+output: Raster for resistance surface modeling
+---
+
+
+Load libraries
+```{r setup, include=FALSE, message=FALSE}
+# Cargar paquetes esenciales para modelado, visualización y manejo de datos espaciales
+library(biomod2)     # Modelado de distribución de especies
+library(terra)       # Manejo de datos raster
+library(sp)          # Datos espaciales
+library(raster)      # Manipulación de datos raster
+library(sf)          # Datos espaciales vectoriales
+
+# Paquetes para análisis y manipulación de datos
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(gtools)
+library(Hmisc)
+library(caret)
+
+# Paquetes de visualización
+library(ggplot2)
+library(gridExtra)
+library(viridis)
+library(RColorBrewer)
+library(rasterVis)
+library(adegraphics)
+
+# Análisis estadístico y modelado
+library(ade4)
+library(adehabitatHS)
+library(gam)
+library(earth)
+library(rpart)
+library(mda)
+library(nnet)
+library(randomForest)
+library(gbm)
+library(MASS)
+library(pROC)
+
+# Otros paquetes
+library(here)
+library(knitr)
+library(rgbif)
+library(corrgram)
+library(reshape2)
+library(readxl) #read excel files
+
+
+```
+
+
+
+
+Load climate + topography data
+The raster is a raster stack that contains the input layers that you would like to consider for analysis in ResistanceGA. Otherwise, load rasters individually and merge with terra package. 
+```{r }
+raster <- rast("Spatraster.tif")
+
+```
+
+
+Optional: Crop to island size
+
+Our original rasters are Canary Islands, but we do island-specific analyses individually. therefore, this code will crop the rasters to the vector that you chose, in our case we crop it to a vector showcasing the islands limits. 
+Here we showcase the example of bio1, but we did this for other rasters that we took into consideration such as bio2, bio12, bio18, slope, profile curvature, wind rasters.
+```{r}
+vect <- vect(paste0("islandcontorno.shp"))
+b1 <- crop(raster$bio1, vect)
+
+```
+
+Save raster
+```{r}
+writeRaster(b1, ".raster1.asc", filetype = "AAIGrid", overwrite=TRUE)
+
+```
+
+
