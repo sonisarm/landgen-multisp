@@ -61,7 +61,7 @@ On HPC, this code is executed through **`comparison.slurm`**.
 #### Step 4) Read results
 Output files are saved as RDA (.rda) files, which are binary R data files (not plain text). To access the results, load the file in R and assign the stored object to a variable (you can then inspect it or convert relevant components to a table/data frame).
 ```
-results <- get(load("../../ResistanceGA/Output/AIC.bpalm.pseudorepl.rda"))
+results <- get(load("../../ResistanceGA/Output/AIC.rda"))
 ```
 
 
