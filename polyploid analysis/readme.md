@@ -46,7 +46,6 @@ Based on the isolocus and FIS analyses, we generated two datasets for each speci
 
 Rationale: many population genetic structure methods assume a single inheritance model. Mixing loci that follow different segregation rules (disomic vs. tetrasomic) can bias estimates of allele frequencies, heterozygosity, and F-statistics (Meirmans et al. 2018). The partial dataset minimizes this issue.
 
----
 
 ### Key references
 
