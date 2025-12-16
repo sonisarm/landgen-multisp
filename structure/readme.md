@@ -33,3 +33,7 @@ write.Structure(Genambig, ploidy = pl, file=file.path("..", "..", "Data", "Stru"
 2) **TESS3** (Caye et al. 2016): Spatial genetic structure was estimated in R using individuals’ GPS coordinates. The optimal number of clusters was selected based on the lowest cross-validation score.
 
 3) **DAPC** (adegenet; Jombart & Bateman 2008): We performed discriminant analysis of principal components, which does not assume Hardy–Weinberg or linkage equilibrium. Sampling locations were used as prior groups, and the optimal number of PCs retained was chosen with xvalDapc. Discriminant functions were visualized using scatterplots in R.
+
+
+### Visualization
+- **`structure_visualization.Rmd`**: create structure plot (bar plots) to visualize structure results from CLUMPs output. 
