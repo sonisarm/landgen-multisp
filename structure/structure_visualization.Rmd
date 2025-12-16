@@ -1,0 +1,103 @@
+---
+title: "Visualization of structure results"
+output: Structure visualization plot (bar plot)
+date: "2025-11-17"
+---
+
+# Load data and libraries
+
+```{r}
+library(tidyverse)
+
+```
+
+```{r Load data}
+
+# define k, change when necessary 
+k='K2'
+#load data and assign individual
+df <- read.delim(paste0('ClumppIndFile',k,'.output'), sep='', header=FALSE)
+metadata <- read.csv('metadata.csv', sep=';')
+metadata$ID <- rownames(metadata)
+
+pops <- c( "A", "B", "C") # define group of pops that you are interested in (eg. they are separated geographically, or in another island)
+
+```
+
+
+# Prepare data
+
+```{r Merge dataframes}
+
+df_summary <- df %>% group_by(V1) %>%
+  summarise(
+    mean_V6 = V6,
+    mean_V7 = V7,
+    .groups = "drop"
+  ) %>%
+  rename(ID = V1)%>%
+  mutate(ID = as.character(ID))
+
+
+df_summary <- unique(df_summary)
+
+structuredf <- merge(metadata, df_summary, by='ID')
+```
+
+This code orders your data per population for a more organised posterior visualization
+```{r Order per population}
+
+otherpop <- setdiff(levels(factor(structuredf$Pop)), pops)
+otherpop <- sort(otherpop)
+structuredf$Pop <- factor(structuredf$Pop, levels = c(pops, otherpop))
+
+# final structure df 
+structuredf <- structuredf %>%
+  arrange(Pop) %>%
+  mutate(Ind = factor(Ind, levels = unique(Ind)))
+
+
+```
+
+
+```{r Cluster}
+
+structuredf2 <- structuredf %>%
+  pivot_longer(cols = c(mean_V6, mean_V7), names_to = "Cluster", values_to = "Value")
+
+
+# Ensure 'Pop' is a factor with the correct order
+structuredf2$Pop <- factor(structuredf2$Pop, levels = c(pops, otherpop))
+
+# Order 'Ind' by 'Pop' without causing factor issues
+structuredf2 <- structuredf2 %>%
+  arrange(Pop) %>%
+  mutate(Ind = factor(Ind, levels = unique(Ind)))
+```
+
+
+
+# Plot 
+
+```{r Plot}
+
+png(paste0("output.png"), width = 4000, height = 600)
+
+# Now, plot with 'Ind' on the x-axis
+ggplot(structuredf2, aes(x = Ind, y = Value, fill = Cluster)) +
+  geom_bar(stat = "identity", width = 1) +
+  scale_fill_manual(values = c("mean_V6" = "orange", "mean_V7" = "steelblue")) +
+  theme_minimal() +
+  scale_x_discrete(labels = structuredf$Pop) +  # Assign the Pop_label as the label for x-axis
+  theme(
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank(),
+    axis.title = element_blank(),
+    legend.position = "none", 
+    axis.text.x = element_text(angle = 90, hjust = 1)
+  )
+
+dev.off()
+
+```
