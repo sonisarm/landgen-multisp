@@ -1,0 +1,154 @@
+---
+title: "Environmental PCA"
+output: PCA describing differences in environmental conditions between sites
+date: "2025-12-16"
+---
+
+```{r setup, message=FALSE}
+library(tidyr)
+library(ggplot2)
+library(ggfortify)
+library(ggpubr)
+library(devtools)
+library(cowplot)
+library(dplyr)
+library(visdat)
+library(purrr)
+library(tidyverse)
+library(readxl)
+library(terra)
+```
+
+
+# Load data
+This code runs with data from La Palma and Tenerife islands.
+
+1. Coordinates from all species
+```{r}
+Coord <- read_excel("coords.xlsx", sheet = "All") 
+Coord$X <- as.numeric(as.character(Coord$X))
+Coord$Y <- as.numeric(as.character(Coord$Y))
+
+```
+
+2. Load environmental data (eg. temperature, precipitation, etc.)
+
+```{r}
+tf <- rast("island1.tif")
+lp <- rast("island2.tif")
+
+```
+
+3. Extract environmental values from coordinates
+The following code extracts environmental values from each island and merges in a final dataset named Env.
+Here, we consider temperature, precipitation and topography (slope), see 'Methods' section.
+```{r}
+coordv <- vect(Coord, geom=c('X', 'Y'))
+
+tfEnv <- terra::extract(tf, coordv)
+tfEnv <- na.omit(tfEnv)
+tfEnv <- tfEnv %>%dplyr::select(-snow_variable)
+tfEnv <- tfEnv %>% dplyr::select(bio_01, bio_12, Slope, bio_02, bio_18)
+tfEnv$isl <- 'tf'
+
+lpEnv <- terra::extract(lp, coordv)
+lpEnv <- na.omit(lpEnv)
+lpEnv <- lpEnv %>% dplyr::select(bio_01, bio_12, Slope_100m, bio_02, bio_18)
+colnames(lpEnv)[3] <- 'Slope'
+lpEnv$isl <- 'lp'
+
+Env <- rbind(lpEnv, tfEnv)
+
+```
+
+# Check collinearity between values
+Remove any variables that are collinear (> 0.7)
+```{r Check collinearity}
+
+tmp <- Env %>% dplyr::select(-isl)
+col <- spatialEco::collinear(tmp, p=0.7) 
+
+```
+
+In our case, bio01 and bio02 are collinear and we did not consider bio2. 
+```{r}
+Env <- Env %>% dplyr::select(-bio_02)
+```
+
+Log10 transform values:
+```{r}
+Envl10 <- data.frame(
+  b1     = scale(log10(Env$bio_01)),
+  b12           = scale(log10(Env$bio_12)),
+  b18        = scale(log10(Env$bio_18)),
+  slope     = scale(log10(Env$Slope)),
+  island  = Env$isl)
+```
+
+
+# PCA 
+```{r}
+
+envs <- c("b1", "b12","b18","slope")
+
+PCA         <- prcomp(Envl10[, envs])
+summary(PCA) # variance explained
+PCAvalues   <- data.frame(island = Envl10$island, PCA$x)# Extract PC axes for plotting
+
+PCAloadings <- data.frame(Variables = rownames(PCA$rotation), PCA$rotation)          # Extract loading of the variables
+
+PCAvalues$PC2 <- (PCAvalues$PC2*-1)
+PCAloadings$PC2 <- (PCAloadings$PC2*-1)
+
+```
+
+Theme for plotting
+```{r}
+p_my_theme <-  theme( legend.text = element_text(size=7), axis.title= element_text(size=7),
+                      axis.title.x= element_text(colour="black", size=7),
+                      axis.title.y= element_text(colour="black", size=7),
+                      axis.text.x= element_text(colour= "black", size=7),
+                      axis.text.y= element_text(colour= "black", size=7),
+                      panel.background =element_rect(fill="transparent",colour="black"),panel.grid.minor=element_blank(),
+                      panel.border=element_rect(fill=NA,colour="grey50"))
+
+p_my_theme2 <- theme( legend.text = element_text(size=7), axis.title= element_text(size=7),
+                      axis.text.x= element_text(colour= "black", size=7), axis.text.y= element_text(colour= "black", size=7))
+
+```
+
+
+Plotting
+```{r}
+Figure1 <- ggplot(PCAvalues) +   
+  geom_point(size =1, alpha=0.7, 
+             aes(x = PC1, y = PC2, group = island, colour = island, size = island),  # label = T
+             show.legend = FALSE) + coord_fixed() + 
+  scale_colour_manual(values=c("tomato1","royalblue1")) +
+   geom_text(data = PCAloadings, aes(x = PC1*4.0, y = PC2*4.0, label = Variables), size = 2.3)    + 
+  geom_segment(data = PCAloadings, size = 0.25,
+               aes(x = 0, xend = PC1*3.5, y = 0, yend = PC2*3.5),
+               arrow = arrow(length = unit(0.1, "cm")),colour = "black")   +
+  xlab("PC1 (58.7%)") + ylab("PC2 (29%)")   +
+  p_my_theme 
+
+# Marginal density distribution island and global PCA  
+xplot <- ggdensity(PCAvalues, "PC1", fill = "island", color = "island", palette = c("tomato1","royalblue1")) + p_my_theme2
+yplot <- ggdensity(PCAvalues, "PC2", fill = "island", color = "island", palette = c("tomato1","royalblue1")) + rotate() + p_my_theme2
+
+```
+
+Save as PDF
+```{r}
+##
+pdf(file = "Figure_1.pdf",
+    width =6,     
+    height=6,
+    paper = "a4")
+
+cowplot::plot_grid(xplot, NULL, Figure1, yplot, ncol = 2, align = "hv", 
+                   rel_widths = c(2, 1), rel_heights = c(1, 2))
+dev.off()
+```
+
+END
