@@ -9,35 +9,36 @@ print("Defining input data...") # specific per species
 data_csv="coord.csv"
 data_gen="gd.gdv"
 n <- 150
+r <-1
 
 
 print("Loading data...")
 
-load(paste0("bio1_one.rda"))
+load(paste0("bio1_r", r, ".rda"))
 bio1 <- Slope_one
 
-load(paste0("bio2_one.rda"))
+load(paste0("bio2_r", r, ".rda"))
 bio2 <- Slope_one
 
-load(paste0("bio12_one.rda"))
+load(paste0("bio12_r", r, ".rda"))
 bio12 <- Slope_one
 
-load(paste0("bio18_one.rda"))
+load(paste0("bio18_r", r, ".rda"))
 bio18 <- Slope_one
 
-load(paste0("slope_one.rda"))
+load(paste0("slope_r", r, ".rda"))
 slope <- Slope_one
 
-load(paste0("profcurv_one.rda"))
+load(paste0("profcurv_r", r, ".rda"))
 profcurv <- Slope_one
 
-load(paste0("enm_one.rda"))
+load(paste0("enm_r", r, ".rda"))
 enm <- Slope_one
 
-load(paste0("wspeed_one.rda"))
+load(paste0("wspeed_r", r, ".rda"))
 wspeed <- Slope_one
 
-load(paste0("wturb_one.rda"))
+load(paste0("wturb_r", r, ".rda"))
 wturb <- Slope_one
 
 print("loading coordinate and genetic data...")
@@ -68,7 +69,8 @@ AIC.boot <- Resist.boot(mod.names = names(mat.list), dist.mat = mat.list,
                                  iters = 10000, 
                                  obs = n, genetic.mat = response)
 
-save(AIC.boot, file = "AIC.rda")
+save(AIC.boot, file = "AIC_run", r, ".rda")
 print(AIC.boot)
+
 
 
