@@ -26,12 +26,12 @@ raster_dir=raster(paste0("/lustre/ssarmiento/resistance/", var, ".asc"))
 
 print("loading data")
 # read genetic data
-gdunf <- as.matrix(read.table(data_gen, header=TRUE, sep=",", row.names = 1))
+gdunf <- as.matrix(read.table(data_gen, header=TRUE, sep="\t", row.names = 1))
 nrow(gdunf)
 ncol(gdunf)
 
 # read coordinates
-pts<-read.csv(data_csv, sep=',')
+pts<-read.csv(data_csv, sep=';')
 pts<-pts[c("ID", "X", "Y")]
 nrow(pts)
 pts <- na.omit(pts)
@@ -93,4 +93,5 @@ BOOTS.Slope_one<-Resist.boot(mod.names=names(mat.list), dist.mat=mat.list, n.par
 print("saving_boots")
 save(BOOTS.Slope_one, file=paste0("BOOTS.", var, "_one.rda"))
 BOOTS.Slope_one
+
 
