@@ -78,7 +78,7 @@ print("preparing_ss_optim")
 Slope_one<-SS_optim(gdist.inputs=gdist.inputs, GA.inputs=GA.inputs)
 
 print("saving_Slope_one")
-save(Slope_one, file=paste0(var, "_one.rda"))
+save(Slope_one, file=paste0(var, "_r", r, ".rda"))
 
 mat.list<-Slope_one$cd
 k<-rbind(Slope_one$k)
@@ -91,8 +91,9 @@ print("generating_boots")
 BOOTS.Slope_one<-Resist.boot(mod.names=names(mat.list), dist.mat=mat.list, n.parameters=k[,2], sample.prop = 0.75, iters = 10000, obs=n, genetic.mat=response)
 
 print("saving_boots")
-save(BOOTS.Slope_one, file=paste0("BOOTS.", var, "_one.rda"))
+save(BOOTS.Slope_one, file=paste0("BOOTS.", var, "_r", r, ".rda"))
 BOOTS.Slope_one
+
 
 
 
