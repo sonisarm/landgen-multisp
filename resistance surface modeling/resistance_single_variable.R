@@ -22,7 +22,7 @@ print(paste("processed layer:", var))
 
 
 print("loading_raster")
-raster_dir=raster(paste0("/lustre/ssarmiento/resistance/", var, ".asc"))
+raster_dir=raster(paste0("/lustre/ssarmiento/resistance/", var, ".asc")) # bio1, bio2, bio12, bio18, slope, profcurv, wind speed, wind turbulence or enm
 
 print("loading data")
 # read genetic data
@@ -93,5 +93,6 @@ BOOTS.Slope_one<-Resist.boot(mod.names=names(mat.list), dist.mat=mat.list, n.par
 print("saving_boots")
 save(BOOTS.Slope_one, file=paste0("BOOTS.", var, "_one.rda"))
 BOOTS.Slope_one
+
 
 
