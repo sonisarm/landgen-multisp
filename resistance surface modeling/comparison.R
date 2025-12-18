@@ -50,13 +50,16 @@ ids <- pts$ID
 vids <- intersect(ids, rownames(gd))
 gdi <- gd[vids, vids]
 
+# If your matrix represents genetic similarity, convert it to a genetic distance matrix before analysis:
+gdi <- 1-gdi
+
 colnames(gdi)<-NULL
 rownames(gdi)<-NULL
 response<-gdi
 
 
-mat.list <- c(bio1$cd, bio2$cd, bio12$cd, bio18$cd, slope$cd, profcurv$cd, enm$cd, wspeed$cd, wturb$cd)
-k <- rbind(bio1$k, bio2$k, bio12$k, bio18$k, slope$k, profcurv$k, enm$k, wspeed$k, wturb$k)
+mat.list <- c(bio1$cd, bio2$cd, bio12$cd, bio18$cd, slope$cd, profcurv$cd, enm$cd, wspeed$cd, wturb$cd, enm$cd)
+k <- rbind(bio1$k, bio2$k, bio12$k, bio18$k, slope$k, profcurv$k, enm$k, wspeed$k, wturb$k, enm$k)
 
 
 AIC.boot <- Resist.boot(mod.names = names(mat.list), dist.mat = mat.list,
@@ -67,4 +70,5 @@ AIC.boot <- Resist.boot(mod.names = names(mat.list), dist.mat = mat.list,
 
 save(AIC.boot, file = "AIC.rda")
 print(AIC.boot)
+
 
