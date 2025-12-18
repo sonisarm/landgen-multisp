@@ -3,20 +3,18 @@ title: "Environmental PCA"
 output: PCA describing differences in environmental conditions between sites
 date: "2025-12-16"
 ---
+This script performs an environmental PCA and produces a biplot with marginal density distributions. The figure layout and PCA visualization style are adapted from Figure 1 in Barajas Barbosa et al. (2023). 
+Reference:
+Barajas Barbosa, M. P., Craven, D., Weigelt, P., Denelle, P., Otto, R., Díaz, S., ... & Kreft, H. (2023). Assembly of functional diversity in an oceanic island flora. Nature, 619(7970), 545-550.
 
 ```{r setup, message=FALSE}
-library(tidyr)
-library(ggplot2)
-library(ggfortify)
-library(ggpubr)
-library(devtools)
-library(cowplot)
-library(dplyr)
-library(visdat)
-library(purrr)
-library(tidyverse)
 library(readxl)
 library(terra)
+library(dplyr)
+library(spatialEco)
+library(ggplot2)
+library(ggpubr)
+library(cowplot)
 ```
 
 
@@ -150,5 +148,6 @@ cowplot::plot_grid(xplot, NULL, Figure1, yplot, ncol = 2, align = "hv",
                    rel_widths = c(2, 1), rel_heights = c(1, 2))
 dev.off()
 ```
+
 
 END
