@@ -51,6 +51,8 @@ nrow(pts)
 print("after filtration:")
 nrow(gd)
 ncol(gd)
+
+# If your matrix represents genetic similarity, convert it to a genetic distance matrix before analysis:
 gd <- 1-gd
 
 pts<-SpatialPoints( pts[,2:3])
@@ -91,3 +93,4 @@ BOOTS.Slope_one<-Resist.boot(mod.names=names(mat.list), dist.mat=mat.list, n.par
 print("saving_boots")
 save(BOOTS.Slope_one, file=paste0("BOOTS.", var, "_one.rda"))
 BOOTS.Slope_one
+
