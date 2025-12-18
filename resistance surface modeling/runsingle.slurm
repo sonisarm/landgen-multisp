@@ -13,3 +13,5 @@
 #conda activate r-ssarmiento
 
 Rscript resistance_single_variable.R $1
+
+# $1 is the variable/surface (eg. bio1)
