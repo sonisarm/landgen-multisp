@@ -1,7 +1,7 @@
 ---
-title: "Read RDA results (binary)"
-description: short R code to read outputs of resistanceGA
-output: results for resistance surface modeling
+title: "Read RDA results (binary) + present resistanceGA results"
+description: short R code to read and visualize outputs of resistanceGA
+output: Visualization and summary of resistance surface modeling results
 ---
 
 
@@ -1178,5 +1178,6 @@ message("[DONE] PDF saved to: ", file.path(base_dir, isl, paste0("HabitatIntegri
 
 
 ```
+
 
 
