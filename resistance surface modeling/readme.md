@@ -59,11 +59,11 @@ On HPC, this code is executed through **`comparison.slurm`**.
 
 
 #### Step 4) Read results
-Output files are saved as RDA (.rda) files, which are binary R data files (not plain text). To access the results, load the file in R and assign the stored object to a variable (you can then inspect it or convert relevant components to a table/data frame).
+Output files are saved as RDA (.rda) files, which are binary R data files (not plain text). To access the results, load the file in R and assign the stored object to a variable (you can then inspect it or convert relevant components to a table/data frame). For example:
 ```
 results <- get(load("../../ResistanceGA/Output/AIC.rda"))
 ```
-
+The accompanying script `rda_output.Rmd` provides a step-by-step workflow to (i) visualize ResistanceGA outputs, (ii) summarize and compare model support across predictors, (iii) export results into readable formats (e.g., .csv) for local storage, (iv) create composite resistance and conductance layers by retaining predictors with mean Akaike weight > 0.01 and weighting retained surfaces by effect size (avg.R2m), and (v) generate habitat integrity maps by integrating conductance with SDM-derived habitat suitability (see the associated publication for methodological details and interpretation guidance).
 
 
 ---
