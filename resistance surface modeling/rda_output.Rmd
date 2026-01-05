@@ -1,0 +1,1182 @@
+---
+title: "Read RDA results (binary)"
+description: short R code to read outputs of resistanceGA
+output: results for resistance surface modeling
+---
+
+
+```{r Libraries}
+## =========================
+## Libraries
+## =========================
+library(openxlsx)
+library(dplyr)
+library(tools)
+library(tibble)
+
+```
+
+
+# 1. Load RDA manually 
+```{r Load manually to explore}
+results <- get(load(file.choose()))
+results <- unique(results)
+```
+
+
+# 2. Save AIC results summary
+```{r}
+isl <- 'tf'
+r <- 1
+```
+
+
+## Export raw
+```{r load by batches per species}
+# Folder that contains the .rda files (adjust as needed)
+rda_dir <- paste0("../../ResistanceGA/Output/", isl)   # example
+rda_dir
+# Find all .rda files
+rda_files <- list.files(rda_dir, pattern = "\\.rda$", full.names = TRUE)
+
+
+# Helper: load an .rda and return the object(s) inside
+read_rda <- function(f) {
+  e <- new.env(parent = emptyenv())
+  obj_names <- load(f, envir = e)
+
+  if (length(obj_names) == 1) {
+    return(e[[obj_names]])
+  }
+
+  # If an .rda contains multiple objects, return them as a named list
+  mget(obj_names, envir = e)
+}
+
+# Read all files into a list called lp (named by file)
+lp <- setNames(lapply(rda_files, read_rda),
+               tools::file_path_sans_ext(basename(rda_files)))
+
+# Optional: if you want to apply unique() to each table (only makes sense for data frames)
+lp <- lapply(lp, function(x) if (is.data.frame(x)) unique(x) else x)
+```
+
+```{r order by surface name}
+
+surf_order <- c("Distance", "b1","b2","b12","b18","enm","profcurv","slope","wspeed","wturb")
+
+lp <- lapply(lp, function(df) {
+  df %>%
+    mutate(surface = factor(as.character(surface), levels = surf_order)) %>%
+    arrange(surface)
+})
+lp <- lapply(lp, function(df) {
+  other <- setdiff(unique(as.character(df$surface)), surf_order)
+  df %>%
+    mutate(surface = factor(as.character(surface), levels = c(surf_order, other))) %>%
+    arrange(surface)
+})
+
+```
+
+```{r save excel}
+out_file <- file.path(rda_dir, "AIC_summary.xlsx")
+
+wb <- createWorkbook()
+
+nm <- names(lp)
+if (is.null(nm)) nm <- paste0("", seq_along(lp))
+
+# Excel sheet names max 31 chars + must be unique
+nm <- make.unique(substr(nm, 1, 31))
+
+for (i in seq_along(lp)) {
+  addWorksheet(wb, nm[i])
+  writeData(wb, sheet = nm[i], x = lp[[i]])
+}
+
+saveWorkbook(wb, out_file, overwrite = TRUE)
+```
+
+## Calculate mean r1 and r2
+
+```{r order by percent top ranking}
+# 1) Create a "base name" for each element that ignores r1/r2 (or rr1/rr2)
+nm <- names(lp)
+if (is.null(nm)) nm <- paste0("tbl_", seq_along(lp))
+
+base_nm <- gsub("(^|[_\\.])rr?\\d+($|[_\\.])", "\\1", nm, perl = TRUE)  # remove r1/r2 or rr1/rr2 tokens
+base_nm <- gsub("([_\\.])+$", "", base_nm)                              # trim trailing _ or .
+
+# 2) Group indices by base name
+grp <- split(seq_along(lp), base_nm)
+
+# 3) For each group (e.g., r1+r2), bind rows and average numeric columns by surface
+lp_mean <- lapply(grp, function(idx) {
+
+  df_all <- bind_rows(lp[idx], .id = "rep")  # stack r1, r2, ...
+
+  df_mean <- df_all %>%
+    group_by(surface) %>%
+    summarise(
+      across(where(is.numeric), ~ mean(.x, na.rm = TRUE)),
+      .groups = "drop"
+    )
+
+  # 4) Apply your ordering (keep unknown surfaces at the end)
+  other <- setdiff(unique(as.character(df_mean$surface)), surf_order)
+
+  df_mean %>%
+    mutate(surface = factor(as.character(surface), levels = c(surf_order, other))) %>%
+    arrange(surface) %>%
+    mutate(surface = as.character(surface))
+})
+
+
+# re-arrange considering highest weight
+
+lp_mean <- lapply(lp_mean, function(df) {
+  if (!"Percent.top" %in% names(df)) return(df)  # safety
+  df %>%
+    arrange(desc(Percent.top), surface)
+})
+
+
+# ---- reorder columns for final export ----
+want_first <- c("surface", "k", "avg.AICc", "avg.rank", "avg.R2m", "avg.weight", "Percent.top")
+
+lp_mean <- lapply(lp_mean, function(df) {
+  dplyr::select(df, dplyr::any_of(want_first), dplyr::everything())
+})
+
+
+
+```
+
+
+```{r save excel}
+out_file <- file.path(rda_dir, paste0("AIC_summary_mean_", isl ,".xlsx"))
+
+wb <- createWorkbook()
+
+nm <- names(lp_mean)
+if (is.null(nm)) nm <- paste0("", seq_along(lp_mean))
+
+# Excel sheet names max 31 chars + must be unique
+nm <- make.unique(substr(nm, 1, 31))
+
+for (i in seq_along(lp_mean)) {
+  addWorksheet(wb, nm[i])
+  writeData(wb, sheet = nm[i], x = lp_mean[[i]])
+}
+
+saveWorkbook(wb, out_file, overwrite = TRUE)
+```
+
+
+
+# 3. Save single variable results (to get transformation type)
+```{r settings}
+
+## =========================
+## Settings
+## =========================
+base_dir <- "../../ResistanceGA/Output"
+
+isl     <- "tf"
+# lp, tf
+folders <- c("cteydis", "retama", "snoct", "vch", "vguax")
+# c("cteydis", "retama", "snoct", "vch", "vguax")
+# c("cteydis", "saria", "tpalm", "vpalm")
+rs      <- c(1, 2)
+
+out_dir <- file.path(base_dir, isl)   # ../../ResistanceGA/Output/lp
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+
+# Desired variable order for sheet ordering
+var_order <- c("Distance","b1","b2","b12","b18","enm","profcurv","slope","wspeed","wturb")
+
+
+```
+
+
+```{r  save a workbook per species}
+
+## =========================
+## Helpers
+## =========================
+
+# Supports both layouts: .../r1/run1 OR .../r1
+get_r_dir <- function(base_dir, isl, sp, r) {
+  cand <- c(
+    file.path(base_dir, isl, sp, paste0("r", r), paste0("run", r)),
+    file.path(base_dir, isl, sp, paste0("r", r))
+  )
+  cand <- cand[dir.exists(cand)]
+  if (length(cand) == 0) return(NA_character_)
+  cand[1]
+}
+
+# Recursively find a tabular object inside lists
+extract_tabular <- function(x) {
+  if (inherits(x, "data.frame")) return(x)
+  if (is.matrix(x)) return(as.data.frame(x))
+
+  if (is.list(x)) {
+    # If list contains data.frames -> bind them
+    is_df <- vapply(x, inherits, logical(1), "data.frame")
+    if (any(is_df)) return(bind_rows(x[is_df], .id = "component"))
+
+    # If list contains matrices -> bind them
+    is_mat <- vapply(x, is.matrix, logical(1))
+    if (any(is_mat)) return(bind_rows(lapply(x[is_mat], as.data.frame), .id = "component"))
+
+    # Otherwise, recurse until we find a table
+    for (elt in x) {
+      out <- extract_tabular(elt)
+      if (!is.null(out)) return(out)
+    }
+  }
+  NULL
+}
+
+# Load an .rda and return the "best" table (largest rows*cols) found inside
+read_rda_to_table <- function(f) {
+  e <- new.env(parent = emptyenv())
+  obj_names <- load(f, envir = e)
+  objs <- mget(obj_names, envir = e)
+
+  tabs <- lapply(objs, extract_tabular)
+  tabs <- tabs[!vapply(tabs, is.null, logical(1))]
+
+  if (length(tabs) == 0) {
+    return(data.frame(info = sprintf("No tabular object found in %s", basename(f))))
+  }
+
+  sizes <- vapply(tabs, function(z) nrow(z) * ncol(z), numeric(1))
+  tabs[[which.max(sizes)]]
+}
+
+# Infer variable name from filename, fallback to unique(dat$surface) if possible
+infer_var <- function(file, dat) {
+  bn <- tolower(file_path_sans_ext(basename(file)))
+
+  # filename hit
+  m <- regmatches(bn, regexpr("(distance|b\\d+|enm|profcurv|slope|wspeed|wturb)", bn))
+  if (length(m) == 1 && nchar(m) > 0) return(m)
+
+  # table content fallback
+  if (!is.null(dat) && "surface" %in% names(dat)) {
+    u <- unique(as.character(dat$surface))
+    u <- u[!is.na(u)]
+    if (length(u) == 1) return(tolower(u))
+  }
+
+  # last resort
+  substr(bn, 1, 12)
+}
+
+## =========================
+## Export: one workbook per species
+## =========================
+for (sp in folders) {
+
+  wb <- createWorkbook()
+
+  meta <- list()  # list of tibbles (file, r, var, dat=list(dat))
+
+  for (r in rs) {
+
+    rda_dir <- get_r_dir(base_dir, isl, sp, r)
+    if (is.na(rda_dir)) next
+
+    rda_files <- list.files(rda_dir, pattern = "\\.rda$", full.names = TRUE)
+
+    # Skip BOOTS files
+    rda_files <- rda_files[!grepl("^BOOTS", basename(rda_files), ignore.case = TRUE)]
+    if (length(rda_files) == 0) next
+
+    for (f in rda_files) {
+      dat <- read_rda_to_table(f)
+      if (is.null(dat)) dat <- data.frame(info = paste("NULL table in", basename(f)))
+
+      var <- infer_var(f, dat)
+
+      meta[[length(meta) + 1]] <- tibble(
+        file = f,
+        r    = r,
+        var  = var,
+        dat  = list(dat)   # IMPORTANT: list-column so dat is never “flattened”
+      )
+    }
+  }
+
+  if (length(meta) == 0) {
+    warning(sprintf("No non-BOOTS .rda files found for species: %s", sp))
+    next
+  }
+
+  meta_df <- bind_rows(meta) %>%
+    mutate(
+      # enforce desired ordering; unknown vars go at end
+      var = as.character(var),
+      var = factor(var, levels = c(var_order, setdiff(unique(var), var_order)))
+    ) %>%
+    arrange(var, r)
+
+  used_sheet_names <- character(0)
+
+  for (i in seq_len(nrow(meta_df))) {
+
+    var <- as.character(meta_df$var[i])
+    r   <- meta_df$r[i]
+    dat <- meta_df$dat[[i]]
+
+    if (is.null(dat)) dat <- data.frame(info = "NULL table after extraction")
+
+    # Sheet name: var_r1, var_r2 ...
+    sh <- substr(paste0(var, "_r", r), 1, 31)
+    sh <- make.unique(c(used_sheet_names, sh))[length(used_sheet_names) + 1]
+    used_sheet_names <- c(used_sheet_names, sh)
+
+    # Optional metadata columns inside the sheet
+    dat <- mutate(dat, variable = var, r = r, .before = 1)
+
+    addWorksheet(wb, sh)
+    writeData(wb, sheet = sh, x = dat)
+  }
+
+  out_file <- file.path(out_dir, paste0(sp, ".xlsx"))
+  saveWorkbook(wb, out_file, overwrite = TRUE)
+}
+
+```
+
+
+
+
+
+# 4. Get weighted resistance raster per species
+
+```{r library}
+
+library(openxlsx)
+library(dplyr)
+library(terra)
+library(stringr)
+library(tools)
+```
+
+
+
+WARNING: AIC summary excel sheet should have one sheet per species, with the name of the species as sheet name only (eg. cteydis, retama...)
+
+
+TENERIFE:
+isl <- 'tf'
+folders <- c("cteydis", "retama", "snoct", "vch", "vguax")
+
+LA PALMA:
+isl <- "lp"
+folders <- c("cteydis", "saria", "tpalm", "vpalm")
+
+```{r settings}
+
+# -------------------------
+# SETTINGS
+# -------------------------
+base_dir <- "../../ResistanceGA/Output"
+isl <- 'tf'
+folders <- c("cteydis", "retama", "snoct", "vch", "vguax")
+
+# replicate indices used in folder structure: r1/run1_..., r2/run2_...
+r_vec <- c(1, 2)
+
+# filter rule requested
+weight_threshold <- 0.01
+exclude_surface <- "Distance"
+
+# island-level excel (one sheet per species)
+isl_dir <- file.path(base_dir, isl)
+xlsx_path <- file.path(isl_dir, paste0("AIC_summary_mean_", isl, ".xlsx"))
+
+```
+
+
+```{r define functions}
+# -------------------------
+# HELPERS
+# -------------------------
+
+norm_weights <- function(w) {
+  s <- sum(w, na.rm = TRUE)
+  if (is.na(s) || s <= 0) return(rep(NA_real_, length(w)))
+  w / s
+}
+
+# normalize a SpatRaster to 0..1 (0 = min, 1 = max)
+norm01 <- function(r) {
+  rmin <- terra::global(r, "min", na.rm = TRUE)[1, 1]
+  rmax <- terra::global(r, "max", na.rm = TRUE)[1, 1]
+  if (is.na(rmin) || is.na(rmax) || rmax == rmin) return(r)
+  (r - rmin) / (rmax - rmin)
+}
+
+# robust string normalizer (ignore case, spaces, underscores, hyphens)
+canon <- function(x) {
+  tolower(gsub("[^a-z0-9]+", "", x))
+}
+
+# Find the correct Results directory for a given surface in replicate r
+# This avoids assuming the run folder matches surface_name exactly.
+find_results_dir <- function(sp_dir, r, surface_name) {
+  r_dir <- file.path(sp_dir, paste0("r", r))
+  if (!dir.exists(r_dir)) return(NA_character_)
+
+  # candidate run dirs: run1_*, run2_*
+  run_dirs <- list.dirs(r_dir, recursive = FALSE, full.names = TRUE)
+  if (length(run_dirs) == 0) return(NA_character_)
+
+  prefix <- paste0("run", r, "_")
+  run_dirs <- run_dirs[grepl(paste0("^", prefix), basename(run_dirs))]
+  if (length(run_dirs) == 0) return(NA_character_)
+
+  target <- canon(surface_name)
+
+  # match by canonicalized suffix after runX_
+  suffix <- sub(paste0("^", prefix), "", basename(run_dirs))
+  idx <- which(vapply(suffix, canon, character(1)) == target)
+
+  # if exact canonical match fails, do partial match
+  if (length(idx) == 0) {
+    idx <- which(grepl(target, vapply(suffix, canon, character(1)), fixed = TRUE))
+  }
+  if (length(idx) == 0) return(NA_character_)
+
+  res_dir <- file.path(run_dirs[idx[1]], "Results")
+  if (!dir.exists(res_dir)) return(NA_character_)
+  res_dir
+}
+
+# Find an .asc within Results that best matches surface name
+find_surface_asc <- function(results_dir, surface_name) {
+  f1 <- file.path(results_dir, paste0(surface_name, ".asc"))
+  if (file.exists(f1)) return(f1)
+
+  asc_files <- list.files(results_dir, pattern = "\\.asc$", full.names = TRUE)
+  if (length(asc_files) == 0) return(NA_character_)
+
+  target <- canon(surface_name)
+  bases <- canon(file_path_sans_ext(basename(asc_files)))
+
+  # exact canonical match first
+  idx <- which(bases == target)
+  if (length(idx) > 0) return(asc_files[idx[1]])
+
+  # partial match fallback
+  idx2 <- which(grepl(target, bases, fixed = TRUE))
+  if (length(idx2) > 0) return(asc_files[idx2[1]])
+
+  asc_files[1]
+}
+
+read_aic_sheet <- function(xlsx_path, sheet) {
+  df <- openxlsx::read.xlsx(xlsx_path, sheet = sheet)
+  names(df) <- make.names(names(df))
+
+  surface_col <- names(df)[tolower(names(df)) == "surface"]
+  if (length(surface_col) == 0) stop(sprintf("No 'surface' column in sheet '%s'", sheet))
+  surface_col <- surface_col[1]
+
+  weight_col <- names(df)[grepl("^avg\\.weight", tolower(names(df)))]
+  if (length(weight_col) == 0) stop(sprintf("No 'avg.weight' column in sheet '%s'", sheet))
+  weight_col <- weight_col[1]
+
+  r2m_col <- names(df)[grepl("^avg\\.r2m", tolower(names(df)))]
+  if (length(r2m_col) == 0) stop(sprintf("No 'avg.R2m' column in sheet '%s'", sheet))
+  r2m_col <- r2m_col[1]
+
+  df %>%
+    transmute(
+      surface    = .data[[surface_col]],
+      avg.weight = as.numeric(.data[[weight_col]]),
+      avg.R2m    = as.numeric(.data[[r2m_col]])
+    )
+}
+
+# mean across replicate rasters for one surface
+load_mean_surface_over_r <- function(sp_dir, r_vec, surface_name) {
+  rasters <- list()
+
+  for (r in r_vec) {
+    results_dir <- find_results_dir(sp_dir, r, surface_name)
+    if (is.na(results_dir)) {
+      message(sprintf("  [WARN] Missing Results dir for r%d, surface '%s'", r, surface_name))
+      next
+    }
+
+    asc_path <- find_surface_asc(results_dir, surface_name)
+    if (is.na(asc_path) || !file.exists(asc_path)) {
+      message(sprintf("  [WARN] Missing .asc for '%s' in %s", surface_name, results_dir))
+      next
+    }
+
+    rr <- try(terra::rast(asc_path), silent = TRUE)
+    if (inherits(rr, "try-error")) {
+      message(sprintf("  [WARN] Failed to read raster: %s", asc_path))
+      next
+    }
+
+    rasters[[length(rasters) + 1]] <- rr
+  }
+
+  if (length(rasters) == 0) return(NULL)
+
+  # align replicate rasters to first one
+  ref <- rasters[[1]]
+  for (k in seq_along(rasters)) {
+    if (!terra::compareGeom(ref, rasters[[k]], stopOnError = FALSE)) {
+      rasters[[k]] <- terra::resample(rasters[[k]], ref, method = "bilinear")
+    }
+  }
+
+  terra::mean(terra::rast(rasters), na.rm = TRUE)
+}
+
+```
+
+
+```{r create mean .tif}
+# -------------------------
+# RUN
+# -------------------------
+if (!file.exists(xlsx_path)) stop(sprintf("Cannot find: %s", xlsx_path))
+available_sheets <- openxlsx::getSheetNames(xlsx_path)
+
+for (sp in folders) {
+
+  # 1) sheet = species code
+  sh <- available_sheets[tolower(available_sheets) == tolower(sp)]
+  if (length(sh) == 0) stop(sprintf("No sheet named '%s' in %s", sp, xlsx_path))
+  sh <- sh[1]
+  message(sprintf("[INFO] %s: using sheet '%s'", sp, sh))
+
+  sp_dir <- file.path(base_dir, isl, sp)
+  dir.create(sp_dir, recursive = TRUE, showWarnings = FALSE)
+
+  # 2) read table
+  aic <- read_aic_sheet(xlsx_path, sh)
+
+  # 3) filter: avg.weight > 0.01 and drop Distance
+  keep <- aic %>%
+    filter(!is.na(avg.weight), !is.na(avg.R2m)) %>%
+    filter(avg.weight > weight_threshold) %>%
+    filter(tolower(surface) != tolower(exclude_surface)) %>%
+    arrange(desc(avg.weight))
+
+  # save the filtered table per species
+  out_tab <- file.path(sp_dir, paste0(sp, "_surfaces_avgweight_gt_0.01_noDistance.csv"))
+  write.csv(keep, out_tab, row.names = FALSE)
+
+  if (nrow(keep) == 0) {
+    message(sprintf("[SKIP] %s: no surfaces after filtering. Table saved: %s", sp, out_tab))
+    next
+  }
+
+  # 4) weights = avg.R2m normalized to sum 1
+  keep <- keep %>% mutate(w_r2m = norm_weights(avg.R2m))
+
+  # if all avg.R2m are 0, fall back to avg.weight (prevents NA weights)
+  if (all(is.na(keep$w_r2m)) || sum(keep$w_r2m, na.rm = TRUE) == 0) {
+    message(sprintf("  [WARN] %s: avg.R2m sums to 0; falling back to avg.weight for weighting", sp))
+    keep <- keep %>% mutate(w_r2m = norm_weights(avg.weight))
+  }
+
+  # 5) load mean raster per kept surface
+  mean_rasters <- list()
+  used_w <- c()
+  used_surface <- c()
+
+  for (i in seq_len(nrow(keep))) {
+    srf <- keep$surface[i]
+    w   <- keep$w_r2m[i]
+
+    r_mean <- load_mean_surface_over_r(sp_dir, r_vec, srf)
+    if (is.null(r_mean)) {
+      message(sprintf("  [WARN] %s: could not load rasters for '%s' (skipping)", sp, srf))
+      next
+    }
+
+    mean_rasters[[length(mean_rasters) + 1]] <- r_mean
+    used_w <- c(used_w, w)
+    used_surface <- c(used_surface, srf)
+  }
+
+  if (length(mean_rasters) == 0) {
+    message(sprintf("[SKIP] %s: no rasters loaded for kept surfaces", sp))
+    next
+  }
+
+  # renormalize after dropping surfaces that failed to load
+  used_w <- norm_weights(used_w)
+
+  message(sprintf("[INFO] %s: final surfaces (%d): %s",
+                  sp, length(used_surface), paste(used_surface, collapse = ", ")))
+
+  # 6) align to common grid
+  ref <- mean_rasters[[1]]
+  for (k in seq_along(mean_rasters)) {
+    if (!terra::compareGeom(ref, mean_rasters[[k]], stopOnError = FALSE)) {
+      mean_rasters[[k]] <- terra::resample(mean_rasters[[k]], ref, method = "bilinear")
+    }
+  }
+
+  # 7) weighted resistance (raw scale)
+  resist_raw <- sum(terra::rast(mean_rasters) * used_w, na.rm = TRUE)
+
+  # 8) normalize so 0 = lowest resistance, 1 = highest resistance
+  resist_01 <- norm01(resist_raw)
+
+  # 9) save outputs
+  out_raw <- file.path(sp_dir, paste0(sp, "_resistance_R2mWeighted_raw.tif"))
+  out_01  <- file.path(sp_dir, paste0(sp, "_resistance_R2mWeighted_01.tif"))
+
+  terra::writeRaster(resist_raw, out_raw, overwrite = TRUE)
+  terra::writeRaster(resist_01,  out_01,  overwrite = TRUE)
+
+  message(sprintf("[DONE] %s:\n  table: %s\n  raw:   %s\n  norm:  %s",
+                  sp, out_tab, out_raw, out_01))
+}
+
+
+
+```
+
+
+# 5. Plot weighted rasters
+```{r libraries}
+library(terra)
+library(dplyr)
+library(readxl)
+```
+
+
+
+isl <- 'tf'
+folders <- c("cteydis", "retama", "snoct", "vch", "vguax")
+
+or
+
+isl <- "lp"
+folders <- c("cteydis", "saria", "tpalm", "vpalm")  # species codes you processed
+
+```{r settings}
+# -------------------------
+# SETTINGS
+# -------------------------
+
+isl <- 'tf'
+folders <- c("cteydis", "retama", "snoct", "vch", "vguax")
+
+# -----
+base_dir <- "../../ResistanceGA/Output"
+
+# mapping: code -> full species name (must match Coord$Species exactly)
+sp_full <- c(
+  tpalm   = "Thesium palmense",
+  vpalm   = "Viola palmensis",
+  cteydis = "Cheirolophus teydis",
+  retama  = "Spartocytisus supranubius",
+  saria   = "Aria edulis",
+  snoct   = "Silene nocteolens",
+  vch   = "Viola cheiranthifolia",
+  vguax   = "Viola guaxarensis"
+
+)
+
+# Coordinates file
+Coord <- read_excel("../../Data/RawData/CoordinatesAll.xlsx", sheet = "All")
+Coord$X <- as.numeric(as.character(Coord$X))
+Coord$Y <- as.numeric(as.character(Coord$Y))
+
+
+```
+
+
+```{r plot}
+# -------------------------
+# PLOT TO PDF (one page per species)
+# -------------------------
+out_pdf <- file.path(base_dir, isl, paste0("Weighed_conductance_", isl, ".pdf"))
+
+pdf(out_pdf, width = 8.5, height = 7)
+
+for (sp in folders) {
+
+  sp_dir <- file.path(base_dir, isl, sp)
+  tif_path <- file.path(sp_dir, paste0(sp, "_resistance_R2mWeighted_01.tif"))
+
+  if (!file.exists(tif_path)) {
+    message(sprintf("[SKIP] Missing tif for %s: %s", sp, tif_path))
+    next
+  }
+
+  tmp <- terra::rast(tif_path)
+
+  # **CHANGED:** input is already normalized (0–1); compute conductance directly
+  r <- 1 - tmp
+
+  # Filter coordinates for this species (full name)
+  sp_name <- sp_full[[sp]]
+  if (is.null(sp_name)) {
+    message(sprintf("[WARN] No full-name mapping found for code '%s' (skipping points).", sp))
+    pts_df <- Coord[0, ]
+  } else {
+    pts_df <- Coord %>%
+      dplyr::filter(.data$Species == sp_name) %>%
+      dplyr::filter(!is.na(X), !is.na(Y))
+  }
+
+  # Plot raster
+  # **CHANGED:** update title to reflect conductance
+  terra::plot(r, main = paste0(sp_name))
+
+  # Add points (red)
+  if (nrow(pts_df) > 0) {
+
+    # Convert to SpatVector points
+    pts <- terra::vect(pts_df, geom = c("X", "Y"), crs = terra::crs(r))
+
+    terra::points(pts, pch = 16, col = "red", cex = 0.7)
+  } else {
+    message(sprintf("[INFO] No points found for %s (%s)", sp, sp_name))
+  }
+}
+
+dev.off()
+
+message(sprintf("[DONE] PDF saved to: %s", out_pdf))
+
+```
+
+
+# 6. Create habitat integrity per species (and per island) PRESENT
+
+ ============================================================
+Habitat integrity per species (PRESENT) - FULL SCRIPT
+- load resistance (already normalized 0–1) from .tif
+- conductance = 1 - resistance   (no normalization)
+- load present SDM, normalize to 0–1
+- align SDM to conductance
+- HI_present = 0.5*conductance + 0.5*SDM
+- write HI raster + optional PDFs (with and without coordinates)
+ ============================================================
+
+
+
+isl <- 'tf'
+folders <- c("cteydis", "retama", "snoct", "vch", "vguax")
+
+or 
+
+isl <- "lp"
+folders <- c("cteydis", "saria", "tpalm", "vpalm")
+
+
+```{r habitat_integrity_present_full}
+
+library(terra)
+library(readxl)
+library(dplyr)
+
+# -------------------------
+# SETTINGS
+# -------------------------
+isl <- "lp"
+folders <- c("cteydis", "saria", "tpalm", "vpalm")
+
+base_dir <- "../../ResistanceGA/Output"
+sdm_base <- "../../SDM"
+present_scenario <- "proj_Current"
+
+# species code -> full name (must match CoordinatesAll.xlsx Species column)
+sp_full <- c(
+  tpalm   = "Thesium palmense",
+  vpalm   = "Viola palmensis",
+  cteydis = "Cheirolophus teydis",
+  retama  = "Spartocytisus supranubius",
+  saria   = "Aria edulis",
+  snoct   = "Silene nocteolens",
+  vch   = "Viola cheiranthifolia",
+  vguax   = "Viola guaxarensis"
+
+)
+
+# Weights for Habitat Integrity
+w_res <- 0.5
+w_scn <- 0.5
+
+# coordinates
+Coord <- read_excel("../../Data/RawData/CoordinatesAll.xlsx", sheet = "All") %>%
+  mutate(
+    X = as.numeric(as.character(X)),
+    Y = as.numeric(as.character(Y))
+  ) %>%
+  filter(!is.na(X), !is.na(Y)) %>%
+  filter(Origin != "Repoblada")
+
+# set your coordinate CRS (change if yours differs)
+coord_crs <- "EPSG:32628"
+```
+
+```{r helpers}
+
+# -------------------------
+# HELPERS
+# -------------------------
+norm01 <- function(r) {
+  rmin <- terra::global(r, "min", na.rm = TRUE)[1, 1]
+  rmax <- terra::global(r, "max", na.rm = TRUE)[1, 1]
+  if (is.na(rmin) || is.na(rmax) || rmax == rmin) return(r)
+  (r - rmin) / (rmax - rmin)
+}
+
+has_crs <- function(r) {
+  cc <- terra::crs(r)
+  !is.na(cc) && is.character(cc) && nchar(cc) > 0
+}
+
+align_to <- function(r_x, r_ref) {
+  # Fix missing CRS if needed
+  if (!has_crs(r_ref) && has_crs(r_x)) terra::crs(r_ref) <- terra::crs(r_x)
+  if (!has_crs(r_x)   && has_crs(r_ref)) terra::crs(r_x) <- terra::crs(r_ref)
+
+  # Project only if both CRS exist and differ
+  if (has_crs(r_ref) && has_crs(r_x) && terra::crs(r_ref) != terra::crs(r_x)) {
+    r_x <- terra::project(r_x, r_ref, method = "bilinear")
+  }
+
+  # Align grid + extent
+  r_x <- terra::resample(r_x, r_ref, method = "bilinear")
+  r_x <- terra::crop(r_x, r_ref)
+
+  list(r_x = r_x, r_ref = r_ref)
+}
+
+get_species_points <- function(sp_code, Coord, sp_full, template_raster, coord_crs) {
+  sp_name <- sp_full[[sp_code]]
+  df <- Coord %>%
+    dplyr::filter(Species == sp_name) %>%
+    dplyr::select(X, Y) %>%
+    dplyr::filter(stats::complete.cases(.))
+
+  if (nrow(df) == 0) return(NULL)
+
+  v <- terra::vect(df, geom = c("X", "Y"), crs = coord_crs)
+
+  # project to raster CRS if needed
+  if (has_crs(template_raster) && terra::crs(v) != terra::crs(template_raster)) {
+    v <- terra::project(v, terra::crs(template_raster))
+  }
+  v
+}
+
+pm_title <- function(expr_call) as.expression(expr_call)
+
+```
+
+
+
+```{r compute HI}
+
+# -------------------------
+# CORE FUNCTION: compute HI (present)
+# -------------------------
+compute_hi_present <- function(sp, isl, base_dir, sdm_base, present_scenario,
+                               w_res = 0.5, w_scn = 0.5) {
+
+  sp_dir <- file.path(base_dir, isl, sp)
+  dir.create(sp_dir, recursive = TRUE, showWarnings = FALSE)
+
+  # 1) Resistance (already normalized 0–1) -> conductance
+  resist_path <- file.path(sp_dir, paste0(sp, "_resistance_R2mWeighted_01.tif"))
+  if (!file.exists(resist_path)) {
+    warning("Missing resistance raster for ", sp, ": ", resist_path)
+    return(NULL)
+  }
+
+  r_res  <- terra::rast(resist_path)
+  r_cond <- 1 - r_res  # conductance (0–1)
+
+  # 2) Present SDM -> normalize 0–1 -> align to conductance
+  pres_path <- file.path(
+    sdm_base, sp, present_scenario,
+    paste0(present_scenario, "_", sp, "_ensemble.tif")
+  )
+  if (!file.exists(pres_path)) {
+    warning("Missing PRESENT SDM for ", sp, ": ", pres_path)
+    return(NULL)
+  }
+
+  r_sdm   <- terra::rast(pres_path)
+  r_sdm_n <- norm01(r_sdm)  # normalize SDM 0–1 (REQUIRED)
+
+  al <- align_to(r_sdm_n, r_cond)
+  r_sdm_n <- al$r_x
+  r_cond  <- al$r_ref
+
+  # 3) Habitat integrity
+  r_hi <- (w_res * r_cond) + (w_scn * r_sdm_n)
+
+  out_hi <- file.path(sp_dir, paste0("habitat_integrity_present_", isl, "_", sp, ".tif"))
+  terra::writeRaster(r_hi, out_hi, overwrite = TRUE)
+
+  list(
+    sp_dir  = sp_dir,
+    r_res   = r_res,
+    r_cond  = r_cond,
+    r_sdm_n = r_sdm_n,
+    r_hi    = r_hi,
+    out_hi  = out_hi
+  )
+}
+
+```
+
+```{r plot with and without coordinates}
+
+# -------------------------
+# PLOTTING: 3-panels WITHOUT points
+# -------------------------
+plot_hi_present_onepage <- function(sp, sp_full, res_list,
+                                    out_pdf = file.path(res_list$sp_dir, paste0("HI_present_", sp, ".pdf"))) {
+
+  sp_name <- sp_full[[sp]]
+  if (is.null(sp_name) || is.na(sp_name)) sp_name <- sp
+
+  pdf(out_pdf, width = 12, height = 4.5, bg = "transparent")
+  on.exit(dev.off(), add = TRUE)
+
+  op <- par(mfrow = c(1, 3), mar = c(3, 3, 3, 4))
+  on.exit(par(op), add = TRUE)
+
+  terra::plot(res_list$r_sdm_n, main = pm_title(bquote("SDM present (0–1)" ~ italic(.(sp_name)))))
+  terra::plot(res_list$r_cond,  main = pm_title(bquote("Conductance (1 - resistance)" ~ italic(.(sp_name)))))
+  terra::plot(res_list$r_hi,    main = pm_title(bquote("Habitat integrity" ~ italic(.(sp_name)))))
+
+  invisible(out_pdf)
+}
+
+# -------------------------
+# PLOTTING: 3-panels WITH points
+# -------------------------
+plot_hi_species_present_with_points <- function(sp, isl, sp_full,
+                                               res_list, Coord, coord_crs,
+                                               out_pdf = file.path(res_list$sp_dir, paste0("HI_", isl, "_", sp, "_present_coord.pdf"))) {
+
+  sp_name <- sp_full[[sp]]
+  if (is.null(sp_name) || is.na(sp_name)) sp_name <- sp
+
+  pal <- rev(grDevices::terrain.colors(20))
+
+  # points projected to raster CRS using conductance as template
+  pts <- get_species_points(sp, Coord, sp_full, template_raster = res_list$r_cond, coord_crs = coord_crs)
+  add_pts <- function() if (!is.null(pts)) terra::points(pts, col = "red", pch = 16, cex = 0.6)
+
+  pdf(out_pdf, width = 12, height = 4.5, bg = "transparent")
+  on.exit(dev.off(), add = TRUE)
+
+  op <- par(mfrow = c(1, 3), mar = c(3, 3, 3, 4))
+  on.exit(par(op), add = TRUE)
+
+  terra::plot(res_list$r_sdm_n, main = pm_title(bquote("SDM (0–1) " ~ italic(.(sp_name)))), col = pal)
+  add_pts()
+
+  terra::plot(res_list$r_cond,  main = pm_title(bquote("Conductance (1 - resistance) " ~ italic(.(sp_name)))), col = pal)
+  add_pts()
+
+  terra::plot(res_list$r_hi,    main = pm_title(bquote("Habitat integrity " ~ italic(.(sp_name)))), col = pal)
+  add_pts()
+
+  message("[DONE] ", sp, " -> ", out_pdf)
+  invisible(out_pdf)
+}
+
+# -------------------------
+# RUN ALL SPECIES (present)
+# -------------------------
+results_present <- list()
+
+for (sp in folders) {
+
+  res <- compute_hi_present(
+    sp = sp,
+    isl = isl,
+    base_dir = base_dir,
+    sdm_base = sdm_base,
+    present_scenario = present_scenario,
+    w_res = w_res,
+    w_scn = w_scn
+  )
+
+  results_present[[sp]] <- res
+
+  if (is.null(res)) next
+
+  # PDF without points
+  plot_hi_present_onepage(sp, sp_full, res)
+
+  # PDF with points
+  plot_hi_species_present_with_points(sp, isl, sp_full, res, Coord, coord_crs)
+}
+```
+
+
+
+# 7. Create habitat integrity per island PRESENT
+
+
+
+isl <- "tf"
+folders <- c("cteydis", "retama", "snoct", "vch", "vguax")
+nppath <- "../../../Variables para proyecciones de distribución/PN/PN_Teide/Limites/Limite_Teide.shp"
+
+or
+
+isl <- "lp"
+folders <- c("cteydis", "saria", "tpalm", "vpalm")
+nppath <- "../../../Variables para proyecciones de distribución/PN/PN_Caldera/Limites/Limite_Caldera_Taburiente.shp"
+
+
+
+```{r setting}
+library(terra)
+
+# -----------------------------
+# SETTINGS
+# -----------------------------
+
+isl <- "tf"
+folders <- c("cteydis", "retama", "snoct", "vch", "vguax")
+nppath <- "../../../Variables para proyecciones de distribución/PN/PN_Teide/Limites/Limite_Teide.shp"
+
+
+base_dir <- "../../ResistanceGA/Output"
+
+# -----------------------------
+# HELPERS
+# -----------------------------
+has_crs <- function(r) {
+  cc <- terra::crs(r)
+  !is.na(cc) && is.character(cc) && nchar(cc) > 0
+}
+
+align_to <- function(r_x, r_ref) {
+  # Fix missing CRS if needed
+  if (!has_crs(r_ref) && has_crs(r_x)) terra::crs(r_ref) <- terra::crs(r_x)
+  if (!has_crs(r_x)   && has_crs(r_ref)) terra::crs(r_x) <- terra::crs(r_ref)
+
+  # Project only if both CRS exist and differ
+  if (has_crs(r_ref) && has_crs(r_x) && terra::crs(r_ref) != terra::crs(r_x)) {
+    r_x <- terra::project(r_x, r_ref, method = "bilinear")
+  }
+
+  # Align grid + extent
+  r_x <- terra::resample(r_x, r_ref, method = "bilinear")
+  r_x <- terra::crop(r_x, r_ref)
+
+  r_x
+}
+
+mean_across_species <- function(s) terra::app(s, fun = mean, na.rm = TRUE)
+
+```
+
+```{r plot}
+# -----------------------------
+# LOAD + BUILD STACK (HI present)
+# -----------------------------
+hi_list <- list()
+used    <- character(0)
+template <- NULL
+
+for (sp in folders) {
+
+  # **CHANGED:** load Habitat Integrity raster saved previously
+  hi_path <- file.path(base_dir, isl, sp, paste0("habitat_integrity_present_", isl, "_", sp, ".tif"))
+
+  if (!file.exists(hi_path)) {
+    message("[SKIP] Missing HI: ", hi_path)
+    next
+  }
+
+  r_hi <- terra::rast(hi_path)
+
+  # choose template grid (first species that exists)
+  if (is.null(template)) template <- r_hi
+
+  # align to template
+  r_hi_a <- align_to(r_hi, template)
+
+  hi_list[[sp]] <- r_hi_a
+  used <- c(used, sp)
+
+  message("[OK] ", sp)
+}
+
+if (length(used) == 0) stop("No species had habitat integrity rasters. Nothing to do.")
+
+# stack
+hi_stack <- terra::rast(hi_list[used])
+names(hi_stack) <- used
+
+# -----------------------------
+# MEAN HI (present)
+# -----------------------------
+hi_mean <- mean_across_species(hi_stack)
+
+# -----------------------------
+# SAVE
+# -----------------------------
+out_hi <- file.path(base_dir, isl, "habitat_integrity_mean_present.tif")
+terra::writeRaster(hi_mean, out_hi, overwrite = TRUE)
+
+message("[DONE] Used species: ", paste(used, collapse = ", "))
+message("Saved: ", out_hi)
+
+# -----------------------------
+# PLOT (1 panel) + NP boundary
+# -----------------------------
+pal <- rev(grDevices::terrain.colors(20))
+
+np_path <- nppath
+np <- NULL
+if (file.exists(np_path)) {
+  np <- terra::vect(np_path)
+  if (!is.na(terra::crs(hi_mean)) && terra::crs(np) != terra::crs(hi_mean)) {
+    np <- terra::project(np, terra::crs(hi_mean))
+  }
+} else {
+  message("[NOTE] NP boundary not found: ", np_path)
+}
+
+add_np <- function() {
+  if (!is.null(np)) terra::plot(np, add = TRUE, border = "black", lwd = 1.2)
+}
+
+pdf(file.path(base_dir, isl, paste0("HabitatIntegrity_mean_present_", isl, ".pdf")),
+    width = 7.5, height = 6, bg = "transparent")
+par(mfrow = c(1, 1), mar = c(3, 3, 3, 4))
+
+terra::plot(hi_mean, main = "", col = pal)
+add_np()
+
+dev.off()
+
+message("[DONE] PDF saved to: ", file.path(base_dir, isl, paste0("HabitatIntegrity_mean_present_", isl, ".pdf")))
+
+
+
+```
+
+
