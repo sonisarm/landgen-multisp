@@ -40,3 +40,7 @@ The repository is organised into modular directories that mirror the main analyt
 - **`extract wind data/`**  
   Tools to extract, process, and rasterise wind predictors for the study region from publicly available sources
 
+
+### Citation
+When using this repository in academic work, please cite:
+- XXXX
