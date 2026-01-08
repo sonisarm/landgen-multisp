@@ -1,4 +1,4 @@
-## Code for publication "Multi-species landscape genetics to inform territorial planning"
+## Code for publication "*Do alpine island endemics share drivers of connectivity? A multi-species landscape genetic analysis from the Canary Islands*"
 
 This repository accompanies a multi-species landscape genetics study of eight high-mountain endemic plants from Teide and Caldera de Taburiente National Parks (Canary Islands). The study aims to: (*i*) characterise environmental niches and habitat suitability, (*ii*) compare fine-scale spatial genetic structure between short- and long-distance seed dispersers, (*iii*) evaluate how topography, wind and climate shape genetic differentiation, and (*iv*) identify landscape connectivity corridors relevant for territorial planning. 
 
