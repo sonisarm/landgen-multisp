@@ -8,13 +8,13 @@ The following diagram provides an overview of the workflow for the analysis perf
 
 
 Explanation of folder / framwrok sections realted to main analyses:
-
-- **SDMs**: species distribution modeling workflows and code. 
-- **environmental PCA**: pipeline used to represent environmental predictors at the location of the individuals or populations coordinates into orthogonal axes for visualization.
 - **polyploid analysis**: analyses and documentation specific to polyploid considerations in the dataset and downstream population genetic inference.
-- **resistance surface modeling**: landscape resistance modeling code
 - **spatial genetic structure**: code to asses spatial patterns.
 - **structure**: population clustering code and workflows
+- **SDMs**: species distribution modeling workflows and code. 
+- **environmental PCA**: pipeline used to represent environmental predictors at the location of the individuals or populations coordinates into orthogonal axes for visualization.
+- **resistance surface modeling**: landscape resistance modeling code
+
 
 Additionally to these analyses, there are other analyses that include a directory in this repository which are:
 - **file preparation**: pre-processing utilities to standarize and validate project inputs. 
