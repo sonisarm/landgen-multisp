@@ -16,28 +16,27 @@ The repository is organised into modular directories that mirror the main analyt
 #### Core analytical modules (aligned with manuscript objectives)
 
 - **`polyploid analysis/`**  
-  Polyploid-specific processing, analyses, and documentation supporting downstream population genetic inference (e.g., filtering rules, polyploid-aware summaries, and rationale for any partial dataset usage).
+  Polyploid-specific processing, analyses, and documentation supporting downstream population genetic inference (e.g., isolocus assignment)
 
 - **`spatial genetic structure/`**  
-  Fine-scale spatial genetic structure analyses to quantify spatial patterning in genetic variation (e.g., workflows supporting Sp statistic estimation and related spatial diagnostics), including associated figures and summary outputs.
+  Fine-scale spatial genetic structure analyses to quantify spatial patterning in genetic variation
 
 - **`structure/`**  
-  Population genetic structure and clustering workflows (e.g., STRUCTURE and supporting pipelines for preparing inputs, running analyses, and post-processing/visualising results). Where relevant, includes templates for run settings and summarisation scripts.
+  Population genetic structure and clustering workflows (STRUCTURE, DAPC, TESS)
 
 - **`SDMs/`**  
-  Species distribution modelling workflows (BIOMOD2), including occurrence/predictor preparation, model calibration and evaluation, and export of habitat suitability predictions used for interpretation and downstream connectivity modelling.
+  Species distribution modelling workflows using BIOMOD2, including occurrence/predictor preparation, model calibration and evaluation, and export of habitat suitability predictions used for interpretation and downstream connectivity modelling
 
 - **`environmental PCA/`**  
-  Environmental ordination pipeline that extracts environmental predictors at individual or population coordinates and transforms them into orthogonal axes (PCA). Outputs are used for visualisation, niche comparison, and (where relevant) as reduced-dimension predictors for subsequent modelling.
+  Environmental ordination pipeline that extracts environmental predictors at individual or population coordinates and transforms them into orthogonal axes (PCA). Outputs are used for visualisation and niche comparison
 
 - **`resistance surface modeling/`**  
-  Landscape resistance modelling workflows (e.g., ResistanceGA) linking genetic differentiation to hypotheses derived from topography, wind, and climate. Includes scripts to build resistance surfaces, optimise parameters, compare candidate models, and export resistance/connectivity products.
+  Landscape resistance modelling workflows in ResistanceGA linking genetic differentiation to hypotheses derived from topography, wind, and climate. Includes scripts to build resistance surfaces, optimise parameters, compare candidate models, and export resistance/connectivity products
 
 #### Supporting utilities and data preparation
 
 - **`file preparation/`**  
-  Pre-processing utilities to standardise and validate project inputs (e.g., formatting tables, harmonising spatial reference systems, aligning rasters, enforcing consistent naming conventions, and generating analysis-ready datasets).
-
+  Helper scripts to convert raw microsatellite (SSR) into formats commonly used in population genetic analyses
 - **`extract wind data/`**  
-  Tools to extract, process, and rasterise wind predictors for the study region from publicly available sources. Outputs are aligned to the project spatial template (extent, resolution, CRS) for direct use in environmental PCA, SDMs, and resistance modelling.
+  Tools to extract, process, and rasterise wind predictors for the study region from publicly available sources
 
