@@ -43,4 +43,4 @@ The repository is organised into modular directories that mirror the main analyt
 
 ### Citation
 When using this repository in academic work, please cite:
-- XXXX
+*in preparation*
