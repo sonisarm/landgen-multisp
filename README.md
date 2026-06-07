@@ -1,6 +1,8 @@
 ## Code for publication "*Do co-ocurring alpine island species share common drivers of connectivity? A multi-species landscape genetic analysis from the Canary Islands*" (submitted)
 
-This repository provides the code and analytical workflow for a multi-species landscape genetics study of eight high-mountain endemic plant species from Teide and Caldera de Taburiente National Parks, Canary Islands. The study corresponds to the third chapter of Sonia Sarmiento’s PhD thesis.
+This repository provides the code and analytical workflow for a multi-species landscape genetics study of eight high-mountain endemic plant species from Teide and Caldera de Taburiente National Parks, Canary Islands. The study corresponds to the third chapter of Sonia Sarmiento’s PhD thesis and is part of GENCLIMA project, which aims to evaluate functional connectivity among high-mountain and laurel forest species in the Canary Islands.
+
+
 The study aims to: (*i*) characterise environmental niches and habitat suitability, (*ii*) compare fine-scale spatial genetic structure between short- and long-distance seed dispersers, (*iii*) evaluate how topography, wind and climate shape genetic differentiation, and (*iv*) identify landscape connectivity corridors relevant for territorial planning. 
 
 Methodologically, the workflow integrates environmental PCA, species distribution modelling (BIOMOD2), polyploid-appropriate microsatellite analyses, population genetic structure inference (STRUCTURE, TESS3, DAPC), fine-scale spatial genetic structure metrics (Sp statistic), and optimised resistance surface modelling (ResistanceGA) to relate genetic patterns to topo-climatic gradients and to forecast habitat suitability and connectivity.
