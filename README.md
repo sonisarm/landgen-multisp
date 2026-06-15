@@ -46,4 +46,4 @@ The repository is organised into modular directories that mirror the main analyt
 
 ### Citation
 When using this repository in academic work, please cite:
-*Sarmiento Cabello S, Rico Y, Curbelo L et al. (submitted). Do alpine endemics share drivers of connectivity? A multi-species landscape genetic analysis from the Canary Islands*
+*Sarmiento Cabello S, Rico Y, Curbelo L et al. (submitted). Do alpine endemics share drivers of connectivity? Insights from a multi-species landscape genetic analysis from the Canary Islands*
